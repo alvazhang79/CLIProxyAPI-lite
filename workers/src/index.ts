@@ -20,6 +20,8 @@ import type { KVNamespace } from '@cloudflare/workers-types';
 type Bindings = {
   KV: KVNamespace;
   D1: D1Database;
+  ADMIN_TOKEN: string;
+  WORKERS_ENV: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
