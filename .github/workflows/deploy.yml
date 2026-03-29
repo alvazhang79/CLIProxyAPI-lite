@@ -13,7 +13,7 @@ env:
 
 jobs:
   # ============================================================
-  # Typecheck & Build
+  # TypeScript Check & Build
   # ============================================================
   typecheck:
     name: TypeScript Check
@@ -40,130 +40,161 @@ jobs:
         run: cd pages && npm run build
 
   # ============================================================
-  # Provision Infrastructure (create KV + D1 if needed)
+  # Deploy Workers + Pages (single job to avoid cross-job output issues)
   # ============================================================
-  provision:
-    name: Provision CF Resources
+  deploy:
+    name: Deploy to Cloudflare
     runs-on: ubuntu-latest
     needs: typecheck
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    outputs:
-      kv_id: ${{ steps.create-kv.outputs.kv_id }}
-      d1_id: ${{ steps.create-d1.outputs.d1_id }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install wrangler
-        run: npm install -g wrangler
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Authenticate wrangler
-        run: |
-          mkdir -p ~/.wrangler
-          printf '[defaults]\naccount_id = "%s"\n' "$CLOUDFLARE_ACCOUNT_ID" > ~/.wrangler/wrangler.toml
-          echo "Wrangler config written"
-
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
+      # -------------------------------------------------------
+      # 1. Create KV namespace via Cloudflare REST API
+      # -------------------------------------------------------
       - name: Create KV namespace
-        id: create-kv
+        id: kv-step
         run: |
-          KV_RESULT=$(wrangler kv:namespace create cliproxyapi_kv 2>&1)
-          echo "$KV_RESULT"
-          KV_ID=$(echo "$KV_RESULT" | grep "id:" | head -1 | awk '{print $2}' | tr -d '"' || echo "")
-          echo "kv_id=$KV_ID" >> $GITHUB_OUTPUT
+          echo "Creating KV namespace..."
+          RESP=$(curl -s --max-time 30 -X POST \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"cliproxyapi_kv"}' \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")
+
+          # Check if already exists (409 Conflict)
+          if echo "$RESP" | grep -q '"code":7003'; then
+            echo "KV namespace already exists, fetching ID..."
+            LIST=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")
+            KV_ID=$(echo "$LIST" | python3 -c "import sys,json; [print(n['id']) for n in json.load(sys.stdin)['result'] if n['title']=='cliproxyapi_kv']" 2>/dev/null | head -1)
+          else
+            KV_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['id'])" 2>/dev/null)
+          fi
+
           echo "KV_ID=$KV_ID"
+          echo "KV_ID=$KV_ID" >> $GITHUB_ENV
+          if [ -z "$KV_ID" ]; then echo "ERROR: KV_ID is empty"; exit 1; fi
 
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # -------------------------------------------------------
+      # 2. Create D1 database via Cloudflare REST API
+      # -------------------------------------------------------
       - name: Create D1 database
-        id: create-d1
+        id: d1-step
         run: |
-          D1_RESULT=$(wrangler d1 create cliproxyapi-lite-db 2>&1)
-          echo "$D1_RESULT"
-          D1_ID=$(echo "$D1_RESULT" | grep "uuid:" | head -1 | awk '{print $2}' | tr -d '"' || echo "")
-          echo "d1_id=$D1_ID" >> $GITHUB_OUTPUT
+          echo "Creating D1 database..."
+          RESP=$(curl -s --max-time 30 -X POST \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"cliproxyapi-lite-db"}' \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
+
+          # Check if already exists
+          if echo "$RESP" | grep -q '"code":10009'; then
+            echo "D1 database already exists, fetching UUID..."
+            LIST=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
+            D1_ID=$(echo "$LIST" | python3 -c "import sys,json; [print(d['uuid']) for d in json.load(sys.stdin)['result'] if d['name']=='cliproxyapi-lite-db']" 2>/dev/null | head -1)
+          else
+            D1_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['uuid'])" 2>/dev/null)
+          fi
+
+          echo "D1_ID=$D1_ID"
+          echo "D1_ID=$D1_ID" >> $GITHUB_ENV
+          if [ -z "$D1_ID" ]; then echo "ERROR: D1_ID is empty"; exit 1; fi
+
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # -------------------------------------------------------
+      # 3. Inject real IDs into wrangler.toml
+      # -------------------------------------------------------
+      - name: Configure wrangler.toml
+        run: |
+          echo "KV_ID=$KV_ID"
           echo "D1_ID=$D1_ID"
 
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Update workers/wrangler.toml with real IDs
+          sed -i "s/id = \"\"/id = \"$KV_ID\"/" workers/wrangler.toml
+          sed -i "s/database_id = \"\"/database_id = \"$D1_ID\"/" workers/wrangler.toml
 
+          # Verify
+          grep -E "kv_namespaces|d1_databases" -A 3 workers/wrangler.toml || true
+
+      # -------------------------------------------------------
+      # 4. Run D1 migrations (SQLite schema)
+      # -------------------------------------------------------
       - name: Run D1 migrations
         run: |
-          echo "Running migrations..."
-          # Write updated wrangler.toml with real IDs
-          sed -i 's/id = ""/id = "${{ needs.provision.outputs.kv_id }}"/' workers/wrangler.toml
-          sed -i 's/database_id = ""/database_id = "${{ needs.provision.outputs.d1_id }}"/' workers/wrangler.toml
-
+          echo "Running D1 migrations on remote..."
           cd workers
-          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote
+          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote --yes
+
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  # ============================================================
-  # Deploy Workers
-  # ============================================================
-  deploy-workers:
-    name: Deploy Workers
-    runs-on: ubuntu-latest
-    needs: provision
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Update wrangler.toml with real IDs
-        run: |
-          # Replace placeholder IDs with actual provisioned IDs
-          sed -i 's/id = ""/id = "${{ needs.provision.outputs.kv_id }}"/' workers/wrangler.toml
-          sed -i 's/database_id = ""/database_id = "${{ needs.provision.outputs.d1_id }}"/' workers/wrangler.toml
-          echo "wrangler.toml updated"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
+      # -------------------------------------------------------
+      # 5. Install Workers deps
+      # -------------------------------------------------------
       - name: Install Workers deps
-        run: cd workers && npm ci
+        run: |
+          echo "Installing Workers dependencies..."
+          cd workers && npm ci
 
+      # -------------------------------------------------------
+      # 6. Deploy Workers
+      # -------------------------------------------------------
       - name: Deploy Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-          workingDirectory: workers
+        id: deploy-workers
+        run: |
+          echo "Deploying Workers..."
+          cd workers
+          # Wrangler prints the URL on success: https://xxx.workers.dev
+          DEPLOY_OUTPUT=$(npx wrangler deploy --env production 2>&1)
+          echo "$DEPLOY_OUTPUT"
+          # Extract URL from output
+          WORKERS_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9_.-]+\.workers\.dev[^ >]*' | head -1 | tr -d ' ')
+          if [ -z "$WORKERS_URL" ]; then
+            echo "WORKERS_URL not found in output, constructing from known pattern..."
+            WORKERS_URL="https://cliproxyapi-lite.$CLOUDFLARE_ACCOUNT_ID.workers.dev"
+          fi
+          echo "WORKERS_URL=$WORKERS_URL"
+          echo "WORKERS_URL=$WORKERS_URL" >> $GITHUB_ENV
+          echo "workers_url=$WORKERS_URL" >> $GITHUB_OUTPUT
 
-  # ============================================================
-  # Deploy Pages
-  # ============================================================
-  deploy-pages:
-    name: Deploy Pages
-    runs-on: ubuntu-latest
-    needs: deploy-workers
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Pages deps
-        run: cd pages && npm ci
-
+      # -------------------------------------------------------
+      # 7. Build Pages (use Workers URL from env)
+      # -------------------------------------------------------
       - name: Build Pages
         run: |
+          echo "Building Pages with WORKERS_URL=$WORKERS_URL..."
           cd pages
-          echo "VITE_WORKERS_API_URL=https://$(echo '${{ needs.deploy-workers.outputs.workers_url }}' | sed 's/https:\/\///')" >> .env
+          echo "VITE_WORKERS_API_URL=$WORKERS_URL" >> .env
+          cat .env
+          npm ci
           npm run build
-        env:
-          VITE_WORKERS_API_URL: ${{ secrets.WORKERS_API_URL }}
 
+        env:
+          WORKERS_URL: ${{ env.WORKERS_URL }}
+
+      # -------------------------------------------------------
+      # 8. Deploy Pages
+      # -------------------------------------------------------
       - name: Deploy Pages
         uses: cloudflare/pages-action@v1
         with:
@@ -179,7 +210,7 @@ jobs:
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
-    needs: [deploy-pages]
+    needs: deploy
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
