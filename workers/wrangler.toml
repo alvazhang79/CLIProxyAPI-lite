@@ -3,20 +3,26 @@ main = "src/index.ts"
 compatibility_date = "2024-04-15"
 compatibility_flags = ["nodejs_compat"]
 
-# ---- Environments ----
-[env.production]
-vars = { WORKERS_ENV = "production" }
-
-# ---- KV Namespaces (production) ----
-[[env.production.kv_namespaces]]
+# ---- KV Namespaces ----
+[[kv_namespaces]]
 binding = "KV"
 id = "" # Set via `wrangler kv:namespace create cliproxyapi_kv`
 
-# ---- D1 Databases (production) ----
-[[env.production.d1_databases]]
+# ---- D1 Databases ----
+[[d1_databases]]
 binding = "D1"
 database_name = "cliproxyapi-lite-db"
 database_id = "" # Set after `wrangler d1 create cliproxyapi-lite-db`
+
+# ---- Environments ----
+[env.production]
+vars = { WORKERS_ENV = "production" }
+kv_namespaces = [
+  { binding = "KV", id = "" }
+]
+d1_databases = [
+  { binding = "D1", database_name = "cliproxyapi-lite-db", database_id = "" }
+]
 
 # ---- Environment Variables (development) ----
 [vars]

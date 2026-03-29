@@ -123,12 +123,16 @@ jobs:
           echo "KV_ID=$KV_ID"
           echo "D1_ID=$D1_ID"
 
-          # Update workers/wrangler.toml with real IDs (env.production section)
+          # Update workers/wrangler.toml with real IDs (top-level and env.production)
           sed -i "s/id = \"\" # Set via \`wrangler kv:namespace/id = \"$KV_ID\" # Set via \`wrangler kv:namespace/" workers/wrangler.toml
           sed -i "s/database_id = \"\" # Set after \`wrangler d1 create/database_id = \"$D1_ID\" # Set after \`wrangler d1 create/" workers/wrangler.toml
 
+          # Also update env.production section (id = "" inside kv_namespaces = [...])
+          sed -i "/kv_namespaces = \[/,/\]/ s/id = \"\"/id = \"$KV_ID\"/" workers/wrangler.toml
+          sed -i "/d1_databases = \[/,/\]/ s/database_id = \"\"/database_id = \"$D1_ID\"/" workers/wrangler.toml
+
           # Verify
-          grep -E "kv_namespaces|d1_databases|env.production" -A 3 workers/wrangler.toml || true
+          grep -E "kv_namespaces|d1_databases|env.production|id =|database_id =" -A 3 workers/wrangler.toml || true
 
       # -------------------------------------------------------
       # 4. Run D1 migrations (SQLite schema)
