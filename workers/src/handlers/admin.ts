@@ -75,16 +75,7 @@ export async function handleAdminLogin(c: Context): Promise<Response> {
 
     const submittedToken = typeof body?.token === 'string' ? body.token : '';
     if (submittedToken !== adminToken) {
-      return c.json({
-        ok: false,
-        error: '令牌无效',
-        debug: {
-          receivedFirst8: submittedToken.slice(0, 8),
-          expectedFirst8: adminToken.slice(0, 8),
-          receivedHex: Buffer.from(submittedToken).toString('hex'),
-          expectedHex: Buffer.from(adminToken).toString('hex'),
-        }
-      }, 401);
+      return c.json({ ok: false, error: '令牌无效' }, 401);
     }
 
     const sessionToken = crypto.randomUUID();
