@@ -26,10 +26,11 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // ---- Middleware ----
 app.use('*', cors({
-  origin: '*',
+  origin: (origin) => origin, // Must echo back specific origin when credentials: include
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Accept-Language'],
   exposeHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Request-Id'],
+  credentials: true, // Required for cross-origin cookie sessions
   maxAge: 86400,
 }));
 
