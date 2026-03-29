@@ -1,39 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="CLIProxyAPI Lite Icon">
-  <title>CLIProxyAPI Lite Icon</title>
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="32.000000pt" height="32.000000pt" viewBox="0 0 32.000000 32.000000"
+ preserveAspectRatio="xMidYMid meet">
 
-  <defs>
-    <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF6B35"/>
-      <stop offset="100%" style="stop-color:#E85A24"/>
-    </linearGradient>
-    <linearGradient id="lg" x1="0%" y1="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFE66D"/>
-      <stop offset="100%" style="stop-color:#F5C518"/>
-    </linearGradient>
-    <linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#4ECDC4"/>
-      <stop offset="100%" style="stop-color:#3DBDB5"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Cloud (subtle background) -->
-  <ellipse cx="16" cy="24" rx="12" ry="5" fill="url(#cg)" opacity="0.2"/>
-
-  <!-- Shrimp body -->
-  <ellipse cx="14" cy="16" rx="9" ry="5" fill="url(#sg)" transform="rotate(-10, 14, 16)"/>
-
-  <!-- Tail -->
-  <path d="M 5 17 Q 2 14 5 11 L 8 14 Z" fill="#FF6B35"/>
-  <path d="M 5 17 Q 2 20 5 23 L 8 19 Z" fill="#E85A24"/>
-
-  <!-- Head -->
-  <circle cx="21" cy="13" r="3.5" fill="url(#sg)"/>
-
-  <!-- Eye -->
-  <circle cx="22" cy="12" r="1.2" fill="#2C2C54"/>
-
-  <!-- Lightning bolt -->
-  <path d="M 17 8 L 12 15 L 16 15 L 14 22 L 20 14 L 16 14 L 18 8 Z"
-        fill="url(#lg)" stroke="#F5C518" stroke-width="0.3"/>
-
+<g transform="translate(0.000000,32.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M78 194 c-15 -15 -8 -62 13 -85 18 -21 20 -21 13 -4 -4 11 -10 37
+-13 58 -3 22 -9 35 -13 31z"/>
+<path d="M211 100 c-13 -11 -29 -20 -37 -20 -8 0 -14 -5 -14 -11 0 -16 42 0
+70 27 29 29 15 32 -19 4z"/>
+</g>
 </svg>
