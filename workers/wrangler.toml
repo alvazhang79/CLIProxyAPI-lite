@@ -24,9 +24,15 @@ d1_databases = [
   { binding = "D1", database_name = "cliproxyapi-lite-db", database_id = "" }
 ]
 
-# ---- Environment Variables (development) ----
+# ---- Environment Variables ----
 [vars]
 WORKERS_ENV = "development"
+
+[env.production.vars]
+WORKERS_ENV = "production"
+# ADMIN_TOKEN must be set as a Secret in Cloudflare Dashboard
+# (Settings → Variables & Secrets → Add secret)
+ADMIN_TOKEN = ""
 
 # ---- Secrets (set via `wrangler secret put`) ----
 # ADMIN_TOKEN          - plaintext admin token for login (dev/staging)
