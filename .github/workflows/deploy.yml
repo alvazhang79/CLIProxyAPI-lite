@@ -191,7 +191,32 @@ jobs:
           WORKERS_URL: ${{ env.WORKERS_URL }}
 
       # -------------------------------------------------------
-      # 8. Deploy Pages
+      # 8. Create Cloudflare Pages project (idempotent - succeeds if exists)
+      # -------------------------------------------------------
+      - name: Create Pages project
+        run: |
+          echo "Creating Cloudflare Pages project..."
+          RESP=$(curl -s --max-time 30 -X POST \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"cliproxyapi-lite-pages","build_config":{"build_command":"npm run build","destination_dir":"dist"},"source":{"type":"github","config":{"owner":"alvazhang79","repo":"CLIProxyAPI-lite","production_branch":"main"}}}' \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")
+          echo "Pages Response: $RESP"
+          # 4004 = project already exists, that's fine
+          if echo "$RESP" | grep -q '"code":4004'; then
+            echo "Pages project already exists, continuing..."
+          elif echo "$RESP" | grep -q '"success":true'; then
+            echo "Pages project created successfully"
+          else
+            echo "Pages project creation result: $RESP"
+          fi
+
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # -------------------------------------------------------
+      # 9. Deploy Pages
       # -------------------------------------------------------
       - name: Deploy Pages
         uses: cloudflare/pages-action@v1
