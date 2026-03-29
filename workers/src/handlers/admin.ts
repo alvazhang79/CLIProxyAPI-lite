@@ -21,12 +21,21 @@ async function hashToken(token: string): Promise<string> {
 }
 
 async function authenticateAdmin(c: Context): Promise<void> {
+  // Support both Cookie and Authorization: Bearer header
   const cookie = c.req.header('Cookie') ?? '';
   const match = cookie.match(/session=([^;]+)/);
-  const lang = detectLang(c.req.header('accept-language'));
-  if (!match) throw new APIError(401, 'unauthorized', 'No session cookie', lang);
+  let sessionToken = match?.[1];
 
-  const sessionToken = match[1];
+  // Fallback: check Authorization: Bearer <token>
+  if (!sessionToken) {
+    const auth = c.req.header('Authorization') ?? '';
+    const bearer = auth.match(/^Bearer\s+(.+)$/);
+    sessionToken = bearer?.[1];
+  }
+
+  const lang = detectLang(c.req.header('accept-language'));
+  if (!sessionToken) throw new APIError(401, 'unauthorized', 'No session token', lang);
+
   const kv = c.get('KV');
   const session = await kv.get('session:' + sessionToken.slice(0, 64), 'json') as {
     expires_at: number;
@@ -66,19 +75,7 @@ export async function handleAdminLogin(c: Context): Promise<Response> {
 
     const submittedToken = typeof body?.token === 'string' ? body.token : '';
     if (submittedToken !== adminToken) {
-      return c.json({
-        ok: false,
-        error: 'Invalid token',
-        debug: {
-          receivedLength: submittedToken.length,
-          receivedFirst4: submittedToken.slice(0, 4),
-          receivedHex: Buffer.from(submittedToken).toString('hex').slice(0, 20),
-          expectedLength: adminToken.length,
-          expectedFirst4: adminToken.slice(0, 4),
-          rawBodyLength: rawBody.length,
-          rawBodyHex: Buffer.from(rawBody || '').toString('hex').slice(0, 40),
-        }
-      }, 401);
+      return c.json({ ok: false, error: '令牌无效' }, 401);
     }
 
     const sessionToken = crypto.randomUUID();
@@ -109,9 +106,15 @@ export async function handleAdminLogin(c: Context): Promise<Response> {
 export async function handleAdminLogout(c: Context): Promise<Response> {
   const cookie = c.req.header('Cookie') ?? '';
   const match = cookie.match(/session=([^;]+)/);
-  if (match) {
+  let sessionToken = match?.[1];
+  if (!sessionToken) {
+    const auth = c.req.header('Authorization') ?? '';
+    const bearer = auth.match(/^Bearer\s+(.+)$/);
+    sessionToken = bearer?.[1];
+  }
+  if (sessionToken) {
     const kv = c.get('KV');
-    await deleteAdminSession(kv, match[1]);
+    await deleteAdminSession(kv, sessionToken);
   }
   return new Response(JSON.stringify({ ok: true }), {
     headers: {
