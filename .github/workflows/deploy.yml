@@ -157,17 +157,32 @@ jobs:
       # -------------------------------------------------------
       # 6. Deploy Workers
       # -------------------------------------------------------
+      # Set ADMIN_TOKEN secret before deploy (separate step to avoid interference)
+      - name: Set Workers secrets
+        run: |
+          echo "Setting ADMIN_TOKEN secret..."
+          cd workers
+          echo "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN --env production
+
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+
+      # Deploy Workers
       - name: Deploy Workers
         id: deploy-workers
         run: |
           echo "Deploying Workers..."
           cd workers
-          # Set ADMIN_TOKEN secret via wrangler (will be created or updated)
-          echo "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN --env production
-          # Deploy Workers
-          DEPLOY_OUTPUT=$(npx wrangler deploy --env production 2>&1) || true
+          DEPLOY_OUTPUT=$(npx wrangler deploy --env production --dry-run 2>&1 || true)
+          echo "Dry run: $DEPLOY_OUTPUT"
+          # Force upload by deleting old script then deploying
+          echo "Deleting old worker..."
+          npx wrangler workers delete cliproxyapi-lite-production --yes 2>/dev/null || true
+          echo "Deploying fresh..."
+          DEPLOY_OUTPUT=$(npx wrangler deploy --env production 2>&1)
           echo "$DEPLOY_OUTPUT"
-          # Extract URL from output
           WORKERS_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9_.-]+\.workers\.dev[^ >]*' | head -1 | tr -d ' ')
           if [ -z "$WORKERS_URL" ]; then
             echo "WORKERS_URL not found in output, constructing from known pattern..."
@@ -180,7 +195,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
 
       # -------------------------------------------------------
       # 7. Build Pages (use Workers URL from env)
