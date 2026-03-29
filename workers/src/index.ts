@@ -61,6 +61,20 @@ app.get('/debug/env', c => {
   });
 });
 
+// ---- Debug token comparison endpoint ----
+app.post('/debug/test-token', async (c) => {
+  const adminToken = String(c.env.ADMIN_TOKEN ?? '');
+  const body = await c.req.json().catch(() => ({})) as { token?: string };
+  const submitted = String(body.token ?? '');
+  return c.json({
+    adminFirst4: adminToken.slice(0, 4),
+    subFirst4: submitted.slice(0, 4),
+    equal: submitted === adminToken,
+    adminLen: adminToken.length,
+    subLen: submitted.length,
+  });
+});
+
 
 
 
