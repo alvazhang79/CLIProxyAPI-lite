@@ -124,19 +124,7 @@ jobs:
       # -------------------------------------------------------
       # 6. Deploy Workers
       # -------------------------------------------------------
-      # Set ADMIN_TOKEN secret before deploy (separate step to avoid interference)
-      - name: Set Workers secrets
-        run: |
-          echo "Setting ADMIN_TOKEN secret..."
-          cd workers
-          echo "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN --env production
-
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
-
-      # Deploy Workers
+      # Deploy Workers FIRST (wrangler v4 requires version deployed before setting secrets)
       - name: Deploy Workers
         id: deploy-workers
         run: |
@@ -162,6 +150,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Set ADMIN_TOKEN secret AFTER deploy (wrangler v4 requirement)
+      - name: Set Workers secrets
+        run: |
+          echo "Setting ADMIN_TOKEN secret..."
+          cd workers
+          echo "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN --env production
+
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
 
       # -------------------------------------------------------
       # 7. Build Pages (use Workers URL from env)
