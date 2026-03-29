@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --coral: #FF6B35;
+  --coral-dark: #E85A24;
+  --teal: #4ECDC4;
+  --teal-dark: #3DBDB5;
+  --navy: #2C2C54;
+  --navy-light: #3D3D6B;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', Arial, sans-serif;
+  background-color: #f7f7f7;
+  margin: 0;
+  padding: 0;
+  color: #2C2C54;
+}
+
+.font-mono {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f0f0f0; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+/* Logo */
+.logo-text {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Buttons */
+.btn-primary {
+  @apply px-4 py-2 rounded-lg font-medium text-white transition-colors;
+  background-color: var(--coral);
+}
+.btn-primary:hover {
+  background-color: var(--coral-dark);
+}
+
+.btn-secondary {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  @apply border border-gray-300 text-gray-700 bg-white;
+}
+.btn-secondary:hover {
+  @apply bg-gray-50;
+}
+
+/* Nav */
+.nav-link {
+  @apply px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2;
+}
+.nav-link.active {
+  background-color: #FF6B35;
+  color: white;
+}
+.nav-link:not(.active) {
+  color: #666;
+}
+.nav-link:not(.active):hover {
+  background-color: #f0f0f0;
+  color: #2C2C54;
+}
+
+/* Cards */
+.card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+}
+
+/* Table */
+.table-header {
+  @apply text-xs uppercase tracking-wider text-gray-500 font-semibold;
+}
+.table-row {
+  @apply border-b border-gray-50 hover:bg-gray-50 transition-colors;
+}
+
+/* Badge */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+.badge-green {
+  @apply badge bg-green-100 text-green-700;
+}
+.badge-red {
+  @apply badge bg-red-100 text-red-700;
+}
+.badge-blue {
+  @apply badge bg-blue-100 text-blue-700;
+}

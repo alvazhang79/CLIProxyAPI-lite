@@ -1,0 +1,114 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "keys": "API Keys",
+    "models": "Models",
+    "providers": "Providers",
+    "embeddings": "Embeddings",
+    "settings": "Settings",
+    "logs": "Logs"
+  },
+  "login": {
+    "title": "Admin Login",
+    "subtitle": "Enter your admin token to access the dashboard",
+    "token_placeholder": "Enter admin token",
+    "btn": "Sign In",
+    "error": "Invalid token"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "total_keys": "Total API Keys",
+    "requests_today": "Requests Today",
+    "error_rate": "Error Rate",
+    "avg_latency": "Avg Latency",
+    "requests_by_provider": "Requests by Provider",
+    "ms": "ms",
+    "no_data": "No data yet"
+  },
+  "keys": {
+    "title": "API Keys",
+    "create": "Create Key",
+    "name": "Name",
+    "provider": "Provider",
+    "model": "Model",
+    "emb_model": "Embedding Model",
+    "rate_limit": "Rate Limit (req/min)",
+    "status": "Status",
+    "created": "Created",
+    "actions": "Actions",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "delete": "Delete",
+    "confirm_delete": "Are you sure you want to delete this API key?",
+    "key_value": "API Key (shown once)",
+    "copy": "Copy",
+    "copied": "Copied!"
+  },
+  "models": {
+    "title": "Models",
+    "alias": "Alias",
+    "upstream": "Upstream Model",
+    "format": "API Format",
+    "context_window": "Context Window",
+    "streaming": "Streaming",
+    "functions": "Functions",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "providers": {
+    "title": "Providers",
+    "create": "Add Provider",
+    "name": "Name",
+    "display_name": "Display Name",
+    "base_url": "Base URL",
+    "auth_type": "Auth Type",
+    "headers": "Custom Headers",
+    "proxy": "Proxy URL"
+  },
+  "embeddings": {
+    "title": "Embeddings Index",
+    "search": "Search stored embeddings...",
+    "text": "Text",
+    "model": "Model",
+    "created": "Created",
+    "actions": "Actions",
+    "delete": "Delete",
+    "no_data": "No embeddings stored yet"
+  },
+  "settings": {
+    "title": "Settings",
+    "lang": "Language",
+    "lang_en": "English",
+    "lang_zh": "中文",
+    "default_rate_limit": "Default Rate Limit (req/min)",
+    "save": "Save Settings",
+    "saved": "Settings saved!"
+  },
+  "logs": {
+    "title": "Request Logs",
+    "endpoint": "Endpoint",
+    "provider": "Provider",
+    "model": "Model",
+    "latency": "Latency",
+    "status": "Status",
+    "time": "Time"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "logout": "Logout",
+    "no_results": "No results"
+  },
+  "error": {
+    "network": "Network error. Please try again.",
+    "unauthorized": "Session expired. Please login again."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "cliproxyapi-lite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight AI API Gateway, Powered by Edge. Built on Cloudflare Workers & Pages.",
+  "scripts": {
+    "workers:deploy": "cd workers && wrangler deploy",
+    "workers:dev": "cd workers && wrangler dev",
+    "workers:typecheck": "cd workers && tsc --noEmit",
+    "pages:deploy": "cd pages && wrangler pages deploy",
+    "dev": "npm run workers:dev",
+    "deploy": "npm run workers:deploy && npm run pages:deploy"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "ai-gateway",
+    "api-proxy",
+    "openai-compatible",
+    "embeddings",
+    "edge-computing"
+  ],
+  "author": "",
+  "license": "MIT"
+}

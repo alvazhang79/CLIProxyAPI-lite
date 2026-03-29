@@ -1,0 +1,42 @@
+name = "cliproxyapi-lite"
+main = "src/index.ts"
+compatibility_date = "2024-04-15"
+compatibility_flags = ["nodejs_compat"]
+
+# ---- Environments ----
+[env.production]
+vars = { WORKERS_ENV = "production" }
+
+# ---- Environment Variables ----
+[vars]
+WORKERS_ENV = "development"
+
+# ---- Secrets (set via `wrangler secret put`) ----
+# ADMIN_TOKEN          - plaintext admin token for login (dev/staging)
+# ADMIN_TOKEN_HASH     - bcrypt hash of admin token (production)
+# ENCRYPTION_KEY       - AES-256 key, base64 encoded (32 bytes)
+
+# ---- KV Namespaces ----
+[[kv_namespaces]]
+binding = "KV"
+id = "" # Set via `wrangler kv:namespace create cliproxyapi_kv`
+
+# ---- D1 Databases ----
+[[d1_databases]]
+binding = "D1"
+database_name = "cliproxyapi-lite-db"
+database_id = "" # Set after `wrangler d1 create cliproxyapi-lite-db`
+
+# ---- Analytics Engine ----
+# [[analytics_engine_datasets]]
+# binding = "ANALYTICS"
+# dataset = "cliproxyapi-lite"
+
+# ---- Workers Logpush ----
+# logpush = true
+
+# ---- Limit CPU time (for security) ----
+# max_execution_time_ms = 30000
+
+# ---- Streaming format ----
+# workers_forbid_foreign_streaming = true
