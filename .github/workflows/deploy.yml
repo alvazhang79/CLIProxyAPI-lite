@@ -191,45 +191,17 @@ jobs:
           WORKERS_URL: ${{ env.WORKERS_URL }}
 
       # -------------------------------------------------------
-      # 8. Create Pages project (direct-upload mode, no GitHub OAuth needed)
-      # -------------------------------------------------------
-      - name: Create Pages project
-        run: |
-          echo "Creating Cloudflare Pages project (direct-upload mode)..."
-          RESP=$(curl -s --max-time 30 -X POST \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "name":"cliproxyapi-lite-pages",
-              "build_config":{"build_command":"","destination_dir":"dist"},
-              "source":{"type":"direct_upload","config":{"production_branch":"main"}}
-            }' \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")
-          echo "Pages Response: $RESP"
-          if echo "$RESP" | grep -q '"code":8000007'; then
-            echo "Pages project already exists"
-          elif echo "$RESP" | grep -q '"success":true'; then
-            echo "Pages project created successfully"
-          else
-            echo "Pages project result: $RESP"
-          fi
-
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      # -------------------------------------------------------
-      # 9. Deploy Pages via wrangler
+      # 8. Deploy Pages (project must exist in Cloudflare Pages)
+      # Use cloudflare/pages-action - requires GitHub connected in CF dashboard
       # -------------------------------------------------------
       - name: Deploy Pages
-        run: |
-          echo "Deploying Pages via wrangler..."
-          cd pages
-          npx wrangler pages deploy dist --project-name=cliproxyapi-lite-pages 2>&1
-
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: cliproxyapi-lite-pages
+          directory: pages/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================================
   # GitHub Release
