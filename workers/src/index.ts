@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
 import { handleChatCompletions } from './handlers/chat';
 import { handleEmbeddings } from './handlers/embeddings';
 import { handleListModels } from './handlers/models';
@@ -27,6 +26,7 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>();
 
 // ---- Middleware ----
+// (logger removed - it consumes request body making c.req.json() fail)
 app.use('*', cors({
   origin: (origin) => origin, // Must echo back specific origin when credentials: include
   allowMethods: ['GET', 'POST', 'OPTIONS'],
@@ -35,8 +35,6 @@ app.use('*', cors({
   credentials: true, // Required for cross-origin cookie sessions
   maxAge: 86400,
 }));
-
-app.use('*', logger());
 
 // Inject KV/D1 into context via middleware
 app.use('*', async (c, next) => {
