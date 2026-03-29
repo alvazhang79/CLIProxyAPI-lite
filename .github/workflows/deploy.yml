@@ -24,10 +24,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            workers/package-lock.json
-            pages/package-lock.json
 
       # Workers typecheck
       - name: Install Workers deps
