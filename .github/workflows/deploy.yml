@@ -102,45 +102,31 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # -------------------------------------------------------
-      # 2. Create D1 database via Cloudflare REST API
+      # 2. Create D1 database using wrangler (handles auth via token)
       # -------------------------------------------------------
       - name: Create D1 database
         id: d1-step
         run: |
-          echo "Creating D1 database..."
-          RESP=$(curl -s --max-time 30 -X POST \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"name":"cliproxyapi-lite-db"}' \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
+          echo "Creating D1 database via wrangler..."
+          # wrangler uses CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID env vars automatically
+          D1_OUTPUT=$(npx wrangler d1 create cliproxyapi-lite-db 2>&1)
+          echo "$D1_OUTPUT"
 
-          echo "D1 Response: $RESP"
-          echo "---"
+          # Parse the UUID from wrangler output (format: "uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+          D1_ID=$(echo "$D1_OUTPUT" | grep "uuid:" | awk '{print $2}' | tr -d '.,"')
+          echo "D1_ID=$D1_ID"
 
-          SUCCESS=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK' if d.get('success') else 'FAIL')" 2>/dev/null)
-          echo "D1 Success: $SUCCESS"
-
-          if [ "$SUCCESS" = "OK" ]; then
-            D1_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['uuid'])" 2>/dev/null)
-            echo "Created new D1, UUID=$D1_ID"
-          else
-            ERROR_CODE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('errors',[{}])[0].get('code',''))" 2>/dev/null)
-            echo "D1 Error code: $ERROR_CODE"
-            if [ "$ERROR_CODE" = "10009" ] || echo "$RESP" | grep -q "10009" || echo "$RESP" | grep -q "already exists"; then
-              echo "D1 already exists, fetching UUID..."
-              LIST=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
-              echo "D1 List Response: $LIST"
-              D1_ID=$(echo "$LIST" | python3 -c "import sys,json; dbs=json.load(sys.stdin)['result']; uuids=[d['uuid'] for d in dbs if d['name']=='cliproxyapi-lite-db']; print(uuids[0] if uuids else '')" 2>/dev/null)
-            else
-              echo "D1 creation failed with unexpected error. Response: $RESP"
-              exit 1
-            fi
+          if [ -z "$D1_ID" ]; then
+            echo "D1 may already exist, trying to get its UUID from list..."
+            D1_LIST=$(npx wrangler d1 list 2>&1)
+            echo "$D1_LIST"
+            D1_ID=$(echo "$D1_LIST" | grep "cliproxyapi-lite-db" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+            echo "D1_ID=$D1_ID"
           fi
 
           echo "D1_ID=$D1_ID"
           echo "D1_ID=$D1_ID" >> $GITHUB_ENV
-          if [ -z "$D1_ID" ]; then echo "ERROR: D1_ID is empty after all attempts"; exit 1; fi
+          if [ -z "$D1_ID" ]; then echo "ERROR: D1_ID is empty"; exit 1; fi
 
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
