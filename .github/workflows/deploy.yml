@@ -195,7 +195,19 @@ jobs:
           WORKERS_URL: ${{ env.WORKERS_URL }}
 
       # -------------------------------------------------------
-      # 8. Deploy Pages via wrangler (bypasses GitHub Deployment API)
+      # 8. Create Pages project (idempotent - succeeds if exists)
+      # -------------------------------------------------------
+      - name: Create Pages project
+        run: |
+          echo "Creating Pages project..."
+          npx wrangler pages project create cliproxyapi-lite --production-branch=main 2>&1 || true
+
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # -------------------------------------------------------
+      # 9. Deploy Pages via wrangler
       # -------------------------------------------------------
       - name: Deploy Pages
         run: |
