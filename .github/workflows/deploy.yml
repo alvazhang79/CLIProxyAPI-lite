@@ -201,8 +201,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "name":"cliproxyapi-lite-pages",
-              "build_config":{"build_command":"echo no-op","destination_dir":"dist"},
-              "source":{"type":"direct_upload","config":{"branch":"main"}}
+              "build_config":{"build_command":"","destination_dir":"dist"},
+              "source":{"type":"direct_upload","config":{"production_branch":"main"}}
             }' \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")
           echo "Pages Response: $RESP"
