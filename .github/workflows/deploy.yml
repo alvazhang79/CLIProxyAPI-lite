@@ -163,7 +163,7 @@ jobs:
           echo "Deploying Workers..."
           cd workers
           # Wrangler prints the URL on success: https://xxx.workers.dev
-          DEPLOY_OUTPUT=$(npx wrangler deploy --env production 2>&1)
+          DEPLOY_OUTPUT=$(npx wrangler deploy --env production 2>&1) || true
           echo "$DEPLOY_OUTPUT"
           # Extract URL from output
           WORKERS_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9_.-]+\.workers\.dev[^ >]*' | head -1 | tr -d ' ')

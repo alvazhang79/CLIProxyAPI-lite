@@ -30,9 +30,7 @@ WORKERS_ENV = "development"
 
 [env.production.vars]
 WORKERS_ENV = "production"
-# ADMIN_TOKEN must be set as a Secret in Cloudflare Dashboard
-# (Settings → Variables & Secrets → Add secret)
-ADMIN_TOKEN = ""
+# ADMIN_TOKEN must be set as a Secret via Cloudflare Dashboard
 
 # ---- Secrets (set via `wrangler secret put`) ----
 # ADMIN_TOKEN          - plaintext admin token for login (dev/staging)
