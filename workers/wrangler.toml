@@ -14,28 +14,16 @@ binding = "D1"
 database_name = "cliproxyapi-lite-db"
 database_id = "" # Set after `wrangler d1 create cliproxyapi-lite-db`
 
-# ---- Environments ----
-[env.production]
-vars = { WORKERS_ENV = "production" }
-kv_namespaces = [
-  { binding = "KV", id = "" }
-]
-d1_databases = [
-  { binding = "D1", database_name = "cliproxyapi-lite-db", database_id = "" }
-]
-
-# ---- Environment Variables ----
+# ---- Development Variables ----
 [vars]
 WORKERS_ENV = "development"
 
+# ---- Production Variables ----
+# ADMIN_TOKEN must be set as a Secret via:
+#   wrangler secret put ADMIN_TOKEN --env production
+#   or Cloudflare Dashboard → Workers → Settings → Variables & Secrets
 [env.production.vars]
 WORKERS_ENV = "production"
-# ADMIN_TOKEN must be set as a Secret via Cloudflare Dashboard
-
-# ---- Secrets (set via `wrangler secret put`) ----
-# ADMIN_TOKEN          - plaintext admin token for login (dev/staging)
-# ADMIN_TOKEN_HASH     - bcrypt hash of admin token (production)
-# ENCRYPTION_KEY       - AES-256 key, base64 encoded (32 bytes)
 
 # ---- Analytics Engine ----
 # [[analytics_engine_datasets]]
@@ -47,6 +35,3 @@ WORKERS_ENV = "production"
 
 # ---- Limit CPU time (for security) ----
 # max_execution_time_ms = 30000
-
-# ---- Streaming format ----
-# workers_forbid_foreign_streaming = true
