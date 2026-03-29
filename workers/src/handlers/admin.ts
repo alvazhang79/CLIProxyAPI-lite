@@ -55,32 +55,54 @@ async function decryptSecret(c: Context, ciphertext: string): Promise<string> {
 
 // ---- POST /api/admin/login ----
 export async function handleAdminLogin(c: Context): Promise<Response> {
-  const body = await c.req.json().catch(() => ({})) as { token?: string };
-  const adminToken = c.env.ADMIN_TOKEN;
+  try {
+    const rawBody = await c.req.text();
+    const body = (() => { try { return JSON.parse(rawBody || '{}'); } catch { return {}; } }) as { token?: string };
+    const adminToken = c.env.ADMIN_TOKEN as string;
 
-  if (!adminToken || body.token !== adminToken) {
-    return c.json({ ok: false, error: 'Invalid token' }, 401);
+    if (!adminToken) {
+      return c.json({ ok: false, error: 'Server missing ADMIN_TOKEN' }, 500);
+    }
+
+    const submittedToken = typeof body?.token === 'string' ? body.token : '';
+    if (submittedToken !== adminToken) {
+      return c.json({
+        ok: false,
+        error: 'Invalid token',
+        debug: {
+          receivedLength: submittedToken.length,
+          receivedFirst4: submittedToken.slice(0, 4),
+          receivedHex: Buffer.from(submittedToken).toString('hex').slice(0, 20),
+          expectedLength: adminToken.length,
+          expectedFirst4: adminToken.slice(0, 4),
+          rawBodyLength: rawBody.length,
+          rawBodyHex: Buffer.from(rawBody || '').toString('hex').slice(0, 40),
+        }
+      }, 401);
+    }
+
+    const sessionToken = crypto.randomUUID();
+    const kv = c.get('KV');
+    const session = {
+      id: crypto.randomUUID(),
+      token_hash: await hashToken(sessionToken),
+      expires_at: Math.floor(Date.now() / 1000) + 86400,
+      created_at: Math.floor(Date.now() / 1000),
+    };
+
+    await kv.put('session:' + sessionToken.slice(0, 64), JSON.stringify(session), {
+      expirationTtl: 86400,
+    });
+
+    return new Response(JSON.stringify({ ok: true, token: sessionToken }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `session=${sessionToken}; HttpOnly; Path=/; Max-Age=86400; SameSite=Strict`,
+      },
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: 'Internal error: ' + String(err) }, 500);
   }
-
-  const sessionToken = crypto.randomUUID();
-  const kv = c.get('KV');
-  const session = {
-    id: crypto.randomUUID(),
-    token_hash: await hashToken(sessionToken),
-    expires_at: Math.floor(Date.now() / 1000) + 86400,
-    created_at: Math.floor(Date.now() / 1000),
-  };
-
-  await kv.put('session:' + sessionToken.slice(0, 64), JSON.stringify(session), {
-    expirationTtl: 86400,
-  });
-
-  return new Response(JSON.stringify({ ok: true, token: sessionToken }), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Set-Cookie': `session=${sessionToken}; HttpOnly; Path=/; Max-Age=86400; SameSite=Strict`,
-    },
-  });
 }
 
 // ---- POST /api/admin/logout ----
