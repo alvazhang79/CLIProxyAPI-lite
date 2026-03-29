@@ -48,6 +48,23 @@ app.use('*', async (c, next) => {
 // ---- Health Check ----
 app.get('/health', c => c.json({ status: 'ok', timestamp: Math.floor(Date.now() / 1000) }));
 
+// ---- Debug endpoint ----
+app.post('/api/debug2', async (c) => {
+  const rawBody = await c.req.text();
+  let jsonBody = {};
+  try { jsonBody = JSON.parse(rawBody || '{}'); } catch {}
+  const adminToken = c.env.ADMIN_TOKEN;
+  return c.json({
+    rawBody,
+    parsedBody: jsonBody,
+    bodyToken: jsonBody.token || 'MISSING',
+    adminTokenLength: adminToken ? String(adminToken).length : 0,
+    adminTokenFirst4: adminToken ? String(adminToken).slice(0, 4) : 'N/A',
+    match: String(jsonBody.token) === String(adminToken),
+    rawBodyHex: Buffer.from(rawBody || '').toString('hex'),
+  });
+});
+
 
 
 
