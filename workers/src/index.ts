@@ -48,6 +48,17 @@ app.use('*', async (c, next) => {
 // ---- Health Check ----
 app.get('/health', c => c.json({ status: 'ok', timestamp: Math.floor(Date.now() / 1000) }));
 
+// ---- Debug env endpoint ----
+app.get('/debug/env', c => {
+  const adminToken = c.env.ADMIN_TOKEN;
+  return c.json({
+    hasAdminToken: !!adminToken,
+    adminTokenType: typeof adminToken,
+    adminTokenLength: adminToken ? String(adminToken).length : 0,
+    adminTokenFirst4: adminToken ? String(adminToken).slice(0, 4) : 'N/A',
+  });
+});
+
 
 
 
