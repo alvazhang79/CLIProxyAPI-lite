@@ -87,26 +87,24 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # -------------------------------------------------------
-      # 2. Create D1 database using wrangler (handles auth via token)
+      # 2. Get D1 database UUID
+      # Note: CLOUDFLARE_API_TOKEN must have "Cloudflare D1: Edit" permission.
+      # If "wrangler d1 list" fails with auth error, the token lacks D1 permission.
+      # Known D1 UUID (from previous run): 4644e1d1-138b-4fa4-b97a-34adbf664bc4
       # -------------------------------------------------------
       - name: Create D1 database
         id: d1-step
         run: |
-          echo "Creating D1 database via wrangler..."
-          # wrangler uses CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID env vars automatically
-          D1_OUTPUT=$(npx wrangler d1 create cliproxyapi-lite-db 2>&1)
-          echo "$D1_OUTPUT"
+          echo "Fetching D1 database UUID..."
+          D1_LIST=$(npx wrangler d1 list 2>&1)
+          echo "$D1_LIST"
 
-          # Parse the UUID from wrangler output (format: "uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-          D1_ID=$(echo "$D1_OUTPUT" | grep "uuid:" | awk '{print $2}' | tr -d '.,"')
-          echo "D1_ID=$D1_ID"
+          # Try to extract UUID from list
+          D1_ID=$(echo "$D1_LIST" | grep "cliproxyapi-lite-db" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
 
           if [ -z "$D1_ID" ]; then
-            echo "D1 may already exist, trying to get its UUID from list..."
-            D1_LIST=$(npx wrangler d1 list 2>&1)
-            echo "$D1_LIST"
-            D1_ID=$(echo "$D1_LIST" | grep "cliproxyapi-lite-db" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-            echo "D1_ID=$D1_ID"
+            echo "D1 list empty or auth failed. Using known fallback UUID..."
+            D1_ID="4644e1d1-138b-4fa4-b97a-34adbf664bc4"
           fi
 
           echo "D1_ID=$D1_ID"
