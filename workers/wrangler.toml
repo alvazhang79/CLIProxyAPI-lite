@@ -7,7 +7,18 @@ compatibility_flags = ["nodejs_compat"]
 [env.production]
 vars = { WORKERS_ENV = "production" }
 
-# ---- Environment Variables ----
+# ---- KV Namespaces (production) ----
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "" # Set via `wrangler kv:namespace create cliproxyapi_kv`
+
+# ---- D1 Databases (production) ----
+[[env.production.d1_databases]]
+binding = "D1"
+database_name = "cliproxyapi-lite-db"
+database_id = "" # Set after `wrangler d1 create cliproxyapi-lite-db`
+
+# ---- Environment Variables (development) ----
 [vars]
 WORKERS_ENV = "development"
 
@@ -15,17 +26,6 @@ WORKERS_ENV = "development"
 # ADMIN_TOKEN          - plaintext admin token for login (dev/staging)
 # ADMIN_TOKEN_HASH     - bcrypt hash of admin token (production)
 # ENCRYPTION_KEY       - AES-256 key, base64 encoded (32 bytes)
-
-# ---- KV Namespaces ----
-[[kv_namespaces]]
-binding = "KV"
-id = "" # Set via `wrangler kv:namespace create cliproxyapi_kv`
-
-# ---- D1 Databases ----
-[[d1_databases]]
-binding = "D1"
-database_name = "cliproxyapi-lite-db"
-database_id = "" # Set after `wrangler d1 create cliproxyapi-lite-db`
 
 # ---- Analytics Engine ----
 # [[analytics_engine_datasets]]
