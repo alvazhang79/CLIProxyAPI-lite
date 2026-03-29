@@ -138,7 +138,6 @@ jobs:
       - name: Run D1 migrations
         run: |
           echo "Running D1 migrations on remote..."
-          cd workers
           npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote --yes
 
         env:
