@@ -78,15 +78,18 @@ jobs:
             KV_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['id'])" 2>/dev/null)
             echo "Created new KV, ID=$KV_ID"
           else
-            # Try to detect already-exists error
+            # Detect already-exists error (10014 = already exists with this title)
             ERROR_CODE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('errors',[{}])[0].get('code',''))" 2>/dev/null)
             echo "KV Error code: $ERROR_CODE"
-            if [ "$ERROR_CODE" = "7003" ] || echo "$RESP" | grep -q "7003"; then
+            if [ "$ERROR_CODE" = "7003" ] || [ "$ERROR_CODE" = "10014" ] || echo "$RESP" | grep -q "10014"; then
               echo "KV already exists, fetching ID..."
               LIST=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
                 "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")
               echo "KV List Response: $LIST"
               KV_ID=$(echo "$LIST" | python3 -c "import sys,json; ns=json.load(sys.stdin)['result']; ids=[n['id'] for n in ns if n['title']=='cliproxyapi_kv']; print(ids[0] if ids else '')" 2>/dev/null)
+            else
+              echo "KV creation failed with unexpected error. Response: $RESP"
+              exit 1
             fi
           fi
 
@@ -123,12 +126,15 @@ jobs:
           else
             ERROR_CODE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('errors',[{}])[0].get('code',''))" 2>/dev/null)
             echo "D1 Error code: $ERROR_CODE"
-            if [ "$ERROR_CODE" = "10009" ] || echo "$RESP" | grep -q "10009"; then
+            if [ "$ERROR_CODE" = "10009" ] || echo "$RESP" | grep -q "10009" || echo "$RESP" | grep -q "already exists"; then
               echo "D1 already exists, fetching UUID..."
               LIST=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
                 "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
               echo "D1 List Response: $LIST"
               D1_ID=$(echo "$LIST" | python3 -c "import sys,json; dbs=json.load(sys.stdin)['result']; uuids=[d['uuid'] for d in dbs if d['name']=='cliproxyapi-lite-db']; print(uuids[0] if uuids else '')" 2>/dev/null)
+            else
+              echo "D1 creation failed with unexpected error. Response: $RESP"
+              exit 1
             fi
           fi
 
