@@ -1,0 +1,4 @@
+{
+  "include": ["/api/*", "/health", "/debug"],
+  "exclude": []
+}
