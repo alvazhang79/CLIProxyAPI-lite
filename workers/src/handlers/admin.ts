@@ -65,8 +65,7 @@ async function decryptSecret(c: Context, ciphertext: string): Promise<string> {
 // ---- POST /api/admin/login ----
 export async function handleAdminLogin(c: Context): Promise<Response> {
   try {
-    const rawBody = await c.req.text();
-    const body = (() => { try { return JSON.parse(rawBody || '{}'); } catch { return {}; } }) as { token?: string };
+    const body = await c.req.json().catch(() => ({})) as { token?: string };
     const adminToken = c.env.ADMIN_TOKEN as string;
 
     if (!adminToken) {
@@ -75,11 +74,7 @@ export async function handleAdminLogin(c: Context): Promise<Response> {
 
     const submittedToken = typeof body?.token === 'string' ? body.token : '';
     if (submittedToken !== adminToken) {
-      return c.json({
-        ok: false,
-        error: '令牌无效',
-        debug2: { subLen: submittedToken.length, expLen: adminToken.length, subH: submittedToken.slice(0, 4), expH: adminToken.slice(0, 4) }
-      }, 401);
+      return c.json({ ok: false, error: '令牌无效' }, 401);
     }
 
     const sessionToken = crypto.randomUUID();
