@@ -20,8 +20,6 @@ import type { KVNamespace } from '@cloudflare/workers-types';
 type Bindings = {
   KV: KVNamespace;
   D1: D1Database;
-  WORKERS_ENV?: string;
-  ADMIN_TOKEN?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -49,17 +47,7 @@ app.use('*', async (c, next) => {
 // ---- Health Check ----
 app.get('/health', c => c.json({ status: 'ok', timestamp: Math.floor(Date.now() / 1000) }));
 
-// ---- Debug: Check env and KV ----
-app.get('/debug', async (c) => {
-  const env = {
-    WORKERS_ENV: c.env.WORKERS_ENV,
-    hasKV: !!c.env.KV,
-    hasD1: !!c.env.D1,
-    hasAdminToken: !!c.env.ADMIN_TOKEN,
-    adminTokenLength: c.env.ADMIN_TOKEN ? String(c.env.ADMIN_TOKEN).length : 0,
-  };
-  return c.json(env);
-});
+
 
 // ---- API Routes ----
 
