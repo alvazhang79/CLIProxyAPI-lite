@@ -29,10 +29,6 @@ Thumbs.db
 # TypeScript cache
 *.tsbuildinfo
 
-# Workers
-workers/package-lock.json
-pages/package-lock.json
-
 # Secrets (never commit)
 *.pem
 *.key

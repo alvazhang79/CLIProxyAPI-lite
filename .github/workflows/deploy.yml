@@ -13,7 +13,7 @@ env:
 
 jobs:
   # ============================================================
-  # Lint & Typecheck
+  # Typecheck & Build
   # ============================================================
   typecheck:
     name: TypeScript Check
@@ -40,24 +40,81 @@ jobs:
         run: cd pages && npm run build
 
   # ============================================================
-  # Deploy Workers (on push to main or tag)
+  # Provision Infrastructure (create KV + D1 if needed)
+  # ============================================================
+  provision:
+    name: Provision CF Resources
+    runs-on: ubuntu-latest
+    needs: typecheck
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      kv_id: ${{ steps.create-kv.outputs.kv_id }}
+      d1_id: ${{ steps.create-d1.outputs.d1_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create KV namespace
+        id: create-kv
+        run: |
+          KV_ID=$(wrangler kv:namespace create cliproxyapi_kv --json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" || echo "")
+          echo "KV_ID=$KV_ID"
+          if [ -z "$KV_ID" ]; then
+            # Already exists, list and get existing id
+            KV_ID=$(wrangler kv:namespace list --json 2>/dev/null | python3 -c "import sys,json; ns=json.load(sys.stdin); print(next((n['id'] for n in ns if n.get('title')=='cliproxyapi_kv'),''))" || echo "")
+          fi
+          echo "kv_id=$KV_ID" >> $GITHUB_OUTPUT
+
+      - name: Create D1 database
+        id: create-d1
+        run: |
+          D1_ID=$(wrangler d1 create cliproxyapi-lite-db --json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('uuid',''))" || echo "")
+          echo "D1_ID=$D1_ID"
+          if [ -z "$D1_ID" ]; then
+            # Already exists, list and get existing
+            D1_ID=$(wrangler d1 list --json 2>/dev/null | python3 -c "import sys,json; dbs=json.load(sys.stdin); print(next((d['uuid'] for d in dbs if d.get('name')=='cliproxyapi-lite-db'),''))" || echo "")
+          fi
+          echo "d1_id=$D1_ID" >> $GITHUB_OUTPUT
+
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Run D1 migrations
+        run: |
+          echo "Running migrations..."
+          # Write updated wrangler.toml with real IDs
+          sed -i 's/id = ""/id = "${{ needs.provision.outputs.kv_id }}"/' workers/wrangler.toml
+          sed -i 's/database_id = ""/database_id = "${{ needs.provision.outputs.d1_id }}"/' workers/wrangler.toml
+
+          cd workers
+          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ============================================================
+  # Deploy Workers
   # ============================================================
   deploy-workers:
     name: Deploy Workers
     runs-on: ubuntu-latest
-    needs: typecheck
+    needs: provision
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    environment: production
     steps:
       - uses: actions/checkout@v4
+
+      - name: Update wrangler.toml with real IDs
+        run: |
+          # Replace placeholder IDs with actual provisioned IDs
+          sed -i 's/id = ""/id = "${{ needs.provision.outputs.kv_id }}"/' workers/wrangler.toml
+          sed -i 's/database_id = ""/database_id = "${{ needs.provision.outputs.d1_id }}"/' workers/wrangler.toml
+          echo "wrangler.toml updated"
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: workers/package-lock.json
 
-      - name: Install dependencies
+      - name: Install Workers deps
         run: cd workers && npm ci
 
       - name: Deploy Workers
@@ -65,35 +122,32 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env production
+          command: deploy
           workingDirectory: workers
 
-      - name: Save Workers URL
-        run: echo "workers_url=$(curl -s https://api.cloudflare.com/client/v4/workers/domains?zone_name=${{ secrets.CLOUDFLARE_ZONE_DOMAIN }} | jq -r '.result[0].route')" >> $GITHUB_ENV
-
   # ============================================================
-  # Deploy Pages (on push to main or tag)
+  # Deploy Pages
   # ============================================================
   deploy-pages:
     name: Deploy Pages
     runs-on: ubuntu-latest
     needs: deploy-workers
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    environment: production
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: pages/package-lock.json
 
-      - name: Install dependencies
+      - name: Install Pages deps
         run: cd pages && npm ci
 
       - name: Build Pages
-        run: cd pages && npm run build
+        run: |
+          cd pages
+          echo "VITE_WORKERS_API_URL=https://$(echo '${{ needs.deploy-workers.outputs.workers_url }}' | sed 's/https:\/\///')" >> .env
+          npm run build
         env:
           VITE_WORKERS_API_URL: ${{ secrets.WORKERS_API_URL }}
 
@@ -107,31 +161,12 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================================
-  # D1 Migration (run after Workers deploy)
-  # ============================================================
-  migrate-d1:
-    name: D1 Migration
-    runs-on: ubuntu-latest
-    needs: deploy-workers
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run D1 migrations
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 execute cliproxyapi-lite-db --env production --file=scripts/init-d1.sql
-          workingDirectory: workers
-
-  # ============================================================
-  # GitHub Release (on tag)
+  # GitHub Release
   # ============================================================
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
-    needs: [deploy-workers, deploy-pages, migrate-d1]
+    needs: [deploy-pages]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
