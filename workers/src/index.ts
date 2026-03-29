@@ -47,6 +47,18 @@ app.use('*', async (c, next) => {
 // ---- Health Check ----
 app.get('/health', c => c.json({ status: 'ok', timestamp: Math.floor(Date.now() / 1000) }));
 
+// ---- Debug: Check env and KV ----
+app.get('/debug', async (c) => {
+  const env = {
+    WORKERS_ENV: c.env.WORKERS_ENV,
+    hasKV: !!c.env.KV,
+    hasD1: !!c.env.D1,
+    hasAdminToken: !!c.env.ADMIN_TOKEN,
+    adminTokenLength: c.env.ADMIN_TOKEN ? String(c.env.ADMIN_TOKEN).length : 0,
+  };
+  return c.json(env);
+});
+
 // ---- API Routes ----
 
 // POST /v1/chat/completions
