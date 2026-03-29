@@ -47,6 +47,22 @@ app.use('*', async (c, next) => {
 // ---- Health Check ----
 app.get('/health', c => c.json({ status: 'ok', timestamp: Math.floor(Date.now() / 1000) }));
 
+// ---- Test endpoint for debugging ----
+app.post('/test', async (c) => {
+  const adminToken = c.env.ADMIN_TOKEN;
+  const token = c.req.header('Admin-Token');
+  const auth2 = c.req.header('Authorization');
+  let body = {};
+  try { body = await c.req.json(); } catch {}
+  return c.json({
+    hasAdminToken: !!adminToken,
+    adminTokenLength: adminToken ? String(adminToken).length : 0,
+    headerToken: token || 'NONE',
+    authHeader: auth2 || 'NONE',
+    bodyToken: (body as any).token || 'NONE',
+  });
+});
+
 
 
 // ---- API Routes ----
