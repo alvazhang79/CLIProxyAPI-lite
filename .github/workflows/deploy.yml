@@ -55,29 +55,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       # -------------------------------------------------------
-      # 1. Get KV namespace ID (create or reuse existing)
+      # 1. Provision KV namespace (get existing ID)
       # -------------------------------------------------------
       - name: Create KV namespace
         id: kv-step
         run: |
-          echo "Checking for existing KV namespace..."
+          echo "Fetching KV namespace ID..."
           LIST=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")
-
-          KV_ID=$(echo "$LIST" | python3 -c "import sys,json; ns=json.load(sys.stdin)['result']; ids=[n['id'] for n in ns if n['title']=='cliproxyapi_kv']; print(ids[0] if ids else '')" 2>/dev/null)
-          echo "KV namespace ID: $KV_ID"
-
-          if [ -z "$KV_ID" ]; then
-            echo "KV not found, creating new one..."
-            RESP=$(curl -s --max-time 30 -X POST \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d '{"title":"cliproxyapi_kv"}' \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")
-            echo "KV Create Response: $RESP"
-            KV_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['id'])" 2>/dev/null)
-          fi
-
+          KV_ID=$(echo "$LIST" | python3 -c "import sys,json; ids=[n['id'] for n in json.load(sys.stdin)['result'] if n['title']=='cliproxyapi_kv']; print(ids[0] if ids else '')" 2>/dev/null)
           echo "KV_ID=$KV_ID"
           echo "KV_ID=$KV_ID" >> $GITHUB_ENV
           if [ -z "$KV_ID" ]; then echo "ERROR: KV_ID is empty"; exit 1; fi
@@ -87,26 +73,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # -------------------------------------------------------
-      # 2. Get D1 database UUID
-      # Note: CLOUDFLARE_API_TOKEN must have "Cloudflare D1: Edit" permission.
-      # If "wrangler d1 list" fails with auth error, the token lacks D1 permission.
-      # Known D1 UUID (from previous run): 4644e1d1-138b-4fa4-b97a-34adbf664bc4
+      # 2. Provision D1 database (get existing UUID)
       # -------------------------------------------------------
       - name: Create D1 database
         id: d1-step
         run: |
           echo "Fetching D1 database UUID..."
-          D1_LIST=$(npx wrangler d1 list 2>&1)
-          echo "$D1_LIST"
-
-          # Try to extract UUID from list
-          D1_ID=$(echo "$D1_LIST" | grep "cliproxyapi-lite-db" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-
-          if [ -z "$D1_ID" ]; then
-            echo "D1 list empty or auth failed. Using known fallback UUID..."
-            D1_ID="4644e1d1-138b-4fa4-b97a-34adbf664bc4"
-          fi
-
+          RESP=$(curl -s --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
+          D1_ID=$(echo "$RESP" | python3 -c "import sys,json; ids=[d['uuid'] for d in json.load(sys.stdin)['result'] if d['name']=='cliproxyapi-lite-db']; print(ids[0] if ids else '')" 2>/dev/null)
           echo "D1_ID=$D1_ID"
           echo "D1_ID=$D1_ID" >> $GITHUB_ENV
           if [ -z "$D1_ID" ]; then echo "ERROR: D1_ID is empty"; exit 1; fi
@@ -116,23 +91,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # -------------------------------------------------------
-      # 3. Inject real IDs into wrangler.toml
+      # 3. Update wrangler.toml with real IDs
       # -------------------------------------------------------
       - name: Configure wrangler.toml
         run: |
-          echo "KV_ID=$KV_ID"
-          echo "D1_ID=$D1_ID"
-
-          # Update workers/wrangler.toml with real IDs (top-level and env.production)
-          sed -i "s/id = \"\" # Set via \`wrangler kv:namespace/id = \"$KV_ID\" # Set via \`wrangler kv:namespace/" workers/wrangler.toml
-          sed -i "s/database_id = \"\" # Set after \`wrangler d1 create/database_id = \"$D1_ID\" # Set after \`wrangler d1 create/" workers/wrangler.toml
-
-          # Also update env.production section (id = "" inside kv_namespaces = [...])
-          sed -i "/kv_namespaces = \[/,/\]/ s/id = \"\"/id = \"$KV_ID\"/" workers/wrangler.toml
-          sed -i "/d1_databases = \[/,/\]/ s/database_id = \"\"/database_id = \"$D1_ID\"/" workers/wrangler.toml
-
-          # Verify
-          grep -E "kv_namespaces|d1_databases|env.production|id =|database_id =" -A 3 workers/wrangler.toml || true
+          echo "Updating wrangler.toml with KV_ID=$KV_ID and D1_ID=$D1_ID"
+          # Update env.production kv_namespaces id
+          sed -i "s/id = \"4e81ec19fea94b9a860707970faf1415\"/id = \"$KV_ID\"/" workers/wrangler.toml
+          sed -i "s/database_id = \"4644e1d1-138b-4fa4-b97a-34adbf664bc4\"/database_id = \"$D1_ID\"/" workers/wrangler.toml
+          grep -E "kv_namespaces|d1_databases|id =|database_id =" workers/wrangler.toml || true
 
       # -------------------------------------------------------
       # 4. Run D1 migrations (SQLite schema)

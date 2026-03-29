@@ -3,25 +3,21 @@ main = "src/index.ts"
 compatibility_date = "2024-04-15"
 compatibility_flags = ["nodejs_compat"]
 
-# ---- KV Namespaces ----
-[[kv_namespaces]]
+# ---- KV Namespaces (production) ----
+[[env.production.kv_namespaces]]
 binding = "KV"
-id = "" # Set via `wrangler kv:namespace create cliproxyapi_kv`
+id = "4e81ec19fea94b9a860707970faf1415"
 
-# ---- D1 Databases ----
-[[d1_databases]]
+# ---- D1 Databases (production) ----
+[[env.production.d1_databases]]
 binding = "D1"
 database_name = "cliproxyapi-lite-db"
-database_id = "" # Set after `wrangler d1 create cliproxyapi-lite-db`
+database_id = "4644e1d1-138b-4fa4-b97a-34adbf664bc4"
 
-# ---- Development Variables ----
+# ---- Environment Variables ----
 [vars]
 WORKERS_ENV = "development"
 
-# ---- Production Variables ----
-# ADMIN_TOKEN must be set as a Secret via:
-#   wrangler secret put ADMIN_TOKEN --env production
-#   or Cloudflare Dashboard → Workers → Settings → Variables & Secrets
 [env.production.vars]
 WORKERS_ENV = "production"
 
@@ -29,9 +25,3 @@ WORKERS_ENV = "production"
 # [[analytics_engine_datasets]]
 # binding = "ANALYTICS"
 # dataset = "cliproxyapi-lite"
-
-# ---- Workers Logpush ----
-# logpush = true
-
-# ---- Limit CPU time (for security) ----
-# max_execution_time_ms = 30000
