@@ -133,10 +133,11 @@ export async function handleCreateKey(c: Context): Promise<Response> {
   const d1 = c.get('D1');
   const body = await c.req.json().catch(() => null) as {
     name?: string; provider?: string; model?: string;
+    allowed_models?: string[];
     api_secret?: string; embeddings_model?: string; rate_limit?: number;
   } | null;
 
-  if (!body?.name || !body?.provider || !body?.model || !body?.api_secret) {
+  if (!body?.name || !body?.provider || !body?.model) {
     throw new APIError(400, 'invalid_request', 'Missing required fields', detectLang(c.req.header('accept-language')));
   }
 
@@ -145,10 +146,16 @@ export async function handleCreateKey(c: Context): Promise<Response> {
   const keyHash = await hashToken(rawKey);
   const keyPrefix = rawKey.slice(0, 12);
 
-  // Encrypt the upstream API secret
-  const encryptedSecret = await encryptSecret(c, body.api_secret);
+  // Encrypt the upstream API secret (only if provided, not for regenerate mode)
+  const encryptedSecret = body.api_secret && body.api_secret !== 'regenerate'
+    ? await encryptSecret(c, body.api_secret)
+    : '';
 
   const id = crypto.randomUUID();
+  const allowedModels: string[] = Array.isArray(body.allowed_models) && body.allowed_models.length > 0
+    ? body.allowed_models
+    : []; // empty = allow all models (backward compat)
+
   await createAPIKey(d1, {
     id,
     api_key: keyHash,
@@ -156,6 +163,7 @@ export async function handleCreateKey(c: Context): Promise<Response> {
     name: body.name,
     provider: body.provider,
     model: body.model,
+    allowed_models: allowedModels,
     api_secret: encryptedSecret,
     embeddings_provider: body.embeddings_model ? body.provider : undefined,
     embeddings_model: body.embeddings_model,
@@ -167,7 +175,8 @@ export async function handleCreateKey(c: Context): Promise<Response> {
   return c.json({
     id, key_prefix: keyPrefix, name: body.name,
     provider: body.provider, model: body.model,
-    api_secret: rawKey, // returned ONCE only
+    allowed_models: allowedModels,
+    key_value: rawKey, // returned ONCE only
     embeddings_model: body.embeddings_model,
     rate_limit: body.rate_limit ?? 60,
     enabled: true,
@@ -196,6 +205,9 @@ export async function handlePatchKey(c: Context): Promise<Response> {
   if (body.provider !== undefined) updates.provider = body.provider;
   if (body.enabled !== undefined) updates.enabled = Boolean(body.enabled);
   if (body.rate_limit !== undefined) updates.rate_limit = Number(body.rate_limit);
+  if (body.allowed_models !== undefined) {
+    updates.allowed_models = JSON.stringify(body.allowed_models);
+  }
 
   await updateAPIKey(d1, id, updates as Parameters<typeof updateAPIKey>[2]);
   return c.json({ ok: true });

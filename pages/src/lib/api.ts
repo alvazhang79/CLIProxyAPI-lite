@@ -71,6 +71,12 @@ export const adminApi = {
       body: JSON.stringify({ enabled }),
     }),
 
+  updateKey: (id: string, updates: { allowed_models?: string[]; name?: string; model?: string; rate_limit?: number }) =>
+    request<{ ok: boolean }>(`/api/admin/keys/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    }),
+
   // Providers
   listProviders: () =>
     request<{ providers: Provider[] }>('/api/admin/providers'),
@@ -157,6 +163,7 @@ export interface APIKey {
   name: string;
   provider: string;
   model: string;
+  allowed_models: string[];
   embeddings_model?: string;
   rate_limit: number;
   enabled: boolean;
@@ -182,6 +189,7 @@ export interface CreateKeyResponse {
   name: string;
   provider: string;
   model: string;
+  allowed_models: string[];
   embeddings_model?: string;
   rate_limit: number;
   enabled: boolean;

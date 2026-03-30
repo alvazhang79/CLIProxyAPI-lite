@@ -54,6 +54,7 @@ export interface APIKeyRecord {
   name: string;
   provider: string;        // provider name or "custom:<id>"
   model: string;          // default model (alias or real)
+  allowed_models: string[];  // list of allowed model aliases; if empty, allow all (backward compat)
   api_secret: string;      // encrypted upstream key
   embeddings_provider?: string;
   embeddings_model?: string;
@@ -93,6 +94,7 @@ export interface CachedAPIKey {
   name: string;
   provider: string;
   model: string;
+  allowed_models: string[];  // list of allowed model aliases; if empty, allow all (backward compat)
   api_secret: string;
   embeddings_provider: string | null;
   embeddings_model: string | null;

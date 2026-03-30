@@ -107,7 +107,9 @@ jobs:
       - name: Run D1 migrations
         run: |
           echo "Running D1 migrations on remote..."
-          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote --yes
+          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote --yes || echo "init-d1 may already exist"
+          # Add allowed_models column to existing api_keys table (safe if column exists)
+          npx wrangler d1 execute cliproxyapi-lite-db --command="ALTER TABLE api_keys ADD COLUMN allowed_models TEXT DEFAULT '[]'" --remote --yes 2>/dev/null || echo "allowed_models column may already exist"
 
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

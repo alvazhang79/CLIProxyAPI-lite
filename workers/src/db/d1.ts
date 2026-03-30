@@ -16,7 +16,7 @@ export async function findAPIKeyByHash(
 ): Promise<CachedAPIKey | null> {
   // API keys are stored as SHA-256 hashes
   const stmt = d1.prepare(
-    'SELECT id, key_prefix, name, provider, model, api_secret, ' +
+    'SELECT id, key_prefix, name, provider, model, allowed_models, api_secret, ' +
     'embeddings_provider, embeddings_model, excluded_models, rate_limit, enabled ' +
     'FROM api_keys WHERE api_key = ? AND enabled = 1 LIMIT 1'
   );
@@ -30,6 +30,9 @@ export async function findAPIKeyByHash(
     name: result.name as string,
     provider: result.provider as string,
     model: result.model as string,
+    allowed_models: result.allowed_models
+      ? JSON.parse(result.allowed_models as string)
+      : [],
     api_secret: result.api_secret as string,
     embeddings_provider: (result.embeddings_provider as string) ?? null,
     embeddings_model: (result.embeddings_model as string) ?? null,
@@ -45,7 +48,8 @@ export async function createAPIKey(
   d1: D1Database,
   record: {
     id: string; api_key: string; key_prefix: string; name: string;
-    provider: string; model: string; api_secret: string;
+    provider: string; model: string; allowed_models: string[];
+    api_secret: string;
     embeddings_provider?: string; embeddings_model?: string;
     excluded_models: string[]; rate_limit: number; enabled: boolean;
   },
@@ -53,13 +57,14 @@ export async function createAPIKey(
   const now = Math.floor(Date.now() / 1000);
   const stmt = d1.prepare(
     'INSERT INTO api_keys ' +
-    '(id, api_key, key_prefix, name, provider, model, api_secret, ' +
+    '(id, api_key, key_prefix, name, provider, model, allowed_models, api_secret, ' +
     'embeddings_provider, embeddings_model, excluded_models, rate_limit, enabled, created_at, updated_at) ' +
     'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const result = await stmt.bind(
     record.id, record.api_key, record.key_prefix, record.name,
-    record.provider, record.model, record.api_secret,
+    record.provider, record.model, JSON.stringify(record.allowed_models),
+    record.api_secret,
     record.embeddings_provider ?? null, record.embeddings_model ?? null,
     JSON.stringify(record.excluded_models), record.rate_limit,
     record.enabled ? 1 : 0, now, now
@@ -69,7 +74,7 @@ export async function createAPIKey(
 
 export async function listAPIKeys(d1: D1Database): Promise<Partial<APIKeyRecord>[]> {
   const stmt = d1.prepare(
-    'SELECT id, key_prefix, name, provider, model, rate_limit, enabled, created_at, updated_at ' +
+    'SELECT id, key_prefix, name, provider, model, allowed_models, rate_limit, enabled, created_at, updated_at ' +
     'FROM api_keys ORDER BY created_at DESC'
   );
   const { results } = await stmt.all();
@@ -79,6 +84,7 @@ export async function listAPIKeys(d1: D1Database): Promise<Partial<APIKeyRecord>
     name: r.name as string,
     provider: r.provider as string,
     model: r.model as string,
+    allowed_models: r.allowed_models ? JSON.parse(r.allowed_models as string) : [],
     rate_limit: r.rate_limit as number,
     enabled: Boolean(r.enabled),
     created_at: r.created_at as number,
@@ -113,6 +119,7 @@ export async function updateAPIKey(
   if (updates.provider !== undefined) { fields.push('provider = ?'); values.push(updates.provider); }
   if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
   if (updates.rate_limit !== undefined) { fields.push('rate_limit = ?'); values.push(updates.rate_limit); }
+  if (updates.allowed_models !== undefined) { fields.push('allowed_models = ?'); values.push(JSON.stringify(updates.allowed_models)); }
 
   if (fields.length === 0) return false;
 
