@@ -314,6 +314,16 @@ export async function handleFetchProviderModels(c: Context): Promise<Response> {
     body = null;
   }
 
+  const provider = await findCustomProviderById(d1, id);
+  if (!provider) throw new APIError(404, 'not_found', 'Provider not found', detectLang(c.req.header('accept-language')));
+
+  // Use provided API key, or decrypt stored credentials
+  const apiKey = (body?.api_key as string) || provider.encrypted_credentials;
+
+  if (!apiKey) {
+    throw new APIError(400, 'invalid_request', 'Provider API key required (provide api_key in body or set it in provider settings)', detectLang(c.req.header('accept-language')));
+  }
+
   // Decrypt if it's an encrypted string (starts with {)
   let secret = apiKey;
   if (apiKey.startsWith('{')) {
