@@ -4,7 +4,7 @@ interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
   message: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
@@ -22,6 +22,14 @@ export default function ConfirmDialog({
   danger = false,
 }: ConfirmDialogProps) {
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    try {
+      await onConfirm();
+    } catch (err) {
+      console.error('ConfirmDialog onConfirm error:', err);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -42,11 +50,9 @@ export default function ConfirmDialog({
             {cancelText}
           </button>
           <button
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className={`px-4 py-2 text-white rounded-lg transition-colors ${
-              danger
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-coral hover:bg-orange-600'
+              danger ? 'bg-red-500 hover:bg-red-600' : 'bg-coral hover:bg-orange-600'
             }`}
           >
             {confirmText}

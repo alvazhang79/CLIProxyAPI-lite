@@ -74,9 +74,15 @@ export default function Providers() {
       title: t('common.confirm_delete') || '确认删除',
       message: '确定要删除这个 Provider 吗？此操作无法撤销。',
       onConfirm: async () => {
-        await adminApi.deleteProvider(id);
-        loadProviders();
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        try {
+          await adminApi.deleteProvider(id);
+          loadProviders();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        } catch (err) {
+          console.error('Delete failed:', err);
+          setError((err as Error).message);
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       },
       danger: true,
     });
