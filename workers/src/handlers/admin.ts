@@ -303,24 +303,33 @@ export async function handlePatchProvider(c: Context): Promise<Response> {
 
 // ---- POST /api/admin/providers/:id/models ----
 export async function handleFetchProviderModels(c: Context): Promise<Response> {
-  await authenticateAdmin(c);
+  try {
+    await authenticateAdmin(c);
+  } catch(e) { console.error('[auth error]', e); throw e; }
   const id = c.req.param('id') as string;
   const d1 = c.get('D1');
   let body: Record<string, unknown> | null = null;
   try {
     const raw = await c.req.text();
+    console.log('[DEBUG] raw body:', JSON.stringify(raw), 'len:', raw.length);
     body = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
-  } catch {
+    console.log('[DEBUG] parsed body:', body);
+  } catch (e) {
+    console.error('[DEBUG] body parse error:', e);
     // body stays null
   }
+  console.log('[DEBUG] after parse, body:', body, '!body:', !body);
 
   const provider = await findCustomProviderById(d1, id);
+  console.log('[DEBUG] provider:', provider ? 'found' : 'NOT FOUND', id);
   if (!provider) throw new APIError(404, 'not_found', 'Provider not found', detectLang(c.req.header('accept-language')));
 
   // Use provided API key, or decrypt stored credentials
   const apiKey = (body?.api_key as string) || provider.encrypted_credentials;
+  console.log('[DEBUG] apiKey from body:', body?.api_key, 'from provider:', !!provider.encrypted_credentials, 'final:', !!apiKey);
 
   if (!apiKey) {
+    console.log('[DEBUG] throwing: Provider API key required');
     throw new APIError(400, 'invalid_request', 'Provider API key required (provide api_key in body or set it in provider settings)', detectLang(c.req.header('accept-language')));
   }
 
