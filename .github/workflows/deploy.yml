@@ -107,13 +107,17 @@ jobs:
       - name: Run D1 migrations
         run: |
           echo "Running D1 migrations on remote..."
-          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote --yes || echo "init-d1 may already exist"
-          # Add allowed_models column to existing api_keys table (safe if column exists)
-          npx wrangler d1 execute cliproxyapi-lite-db --command="ALTER TABLE api_keys ADD COLUMN allowed_models TEXT DEFAULT '[]'" --remote --yes 2>/dev/null || echo "allowed_models column may already exist"
+          # Init schema (will fail if table exists, which is fine)
+          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql --remote --yes || true
+          # Add missing columns one by one (IF NOT EXISTS pattern doesn't work in SQLite, so we use fallback)
+          npx wrangler d1 execute cliproxyapi-lite-db --command="ALTER TABLE api_keys ADD COLUMN allowed_models TEXT DEFAULT '[]'" --remote --yes || true
+          npx wrangler d1 execute cliproxyapi-lite-db --command="ALTER TABLE api_keys ADD COLUMN embeddings_provider TEXT" --remote --yes || true
+          npx wrangler d1 execute cliproxyapi-lite-db --command="ALTER TABLE api_keys ADD COLUMN excluded_models TEXT DEFAULT '[]'" --remote --yes || true
           # Migration 001: encrypted_credentials + provider_api_keys
-          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/migrate-001.sql --remote --yes 2>/dev/null || echo "migrate-001 may already exist"
-          # Migration 002: add missing columns (embeddings_provider, excluded_models)
-          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/migrate-002.sql --remote --yes 2>/dev/null || echo "migrate-002 may already exist"
+          npx wrangler d1 execute cliproxyapi-lite-db --file=scripts/migrate-001.sql --remote --yes || true
+          # Verify columns exist
+          echo "Verifying api_keys schema..."
+          npx wrangler d1 execute cliproxyapi-lite-db --command="PRAGMA table_info(api_keys)" --remote --yes
 
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
