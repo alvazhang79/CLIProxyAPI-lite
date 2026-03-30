@@ -121,7 +121,7 @@ export async function getProviderForAPIKey(
     }
   } else {
     // First check if it's a custom provider by name (not just by "custom:" prefix)
-    const customByName = d1.prepare(
+    const customByName = await d1.prepare(
       'SELECT * FROM custom_providers WHERE name = ? AND enabled = 1 LIMIT 1'
     ).bind(keyRecord.provider).first().catch(() => null) as Record<string, unknown> | null;
 
