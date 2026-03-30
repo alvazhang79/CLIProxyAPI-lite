@@ -595,3 +595,41 @@ export async function handlePatchSettings(c: Context): Promise<Response> {
 
   return c.json({ ok: true });
 }
+
+// ---- POST /api/admin/keys/:id/regenerate ----
+export async function handleRegenerateKey(c: Context): Promise<Response> {
+  await authenticateAdmin(c);
+  const d1 = c.get('D1');
+  const id = c.req.param('id');
+
+  // Get existing key info
+  const existing = await d1.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first() as {
+    name: string;
+    provider: string;
+    model: string;
+    allowed_models: string;
+    api_secret: string;
+    embeddings_model: string | null;
+    rate_limit: number;
+  } | null;
+
+  if (!existing) {
+    throw new APIError(404, 'not_found', 'API Key not found', detectLang(c.req.header('accept-language')));
+  }
+
+  // Generate new key
+  const rawKey = 'sk_live_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[b % 62]).join('');
+  const keyHash = await hashToken(rawKey);
+  const keyPrefix = rawKey.slice(0, 12);
+
+  // Update existing key
+  const now = Math.floor(Date.now() / 1000);
+  await d1.prepare(`
+    UPDATE api_keys 
+    SET api_key = ?, key_prefix = ?, updated_at = ?
+    WHERE id = ?
+  `).bind(keyHash, keyPrefix, now, id).run();
+
+  return c.json({ ok: true, key_value: rawKey, key_prefix: keyPrefix });
+}

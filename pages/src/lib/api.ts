@@ -81,6 +81,11 @@ export const adminApi = {
       body: JSON.stringify(updates),
     }),
 
+  regenerateKey: (id: string) =>
+    request<{ ok: boolean; key_value: string; key_prefix: string }>(`/api/admin/keys/${id}/regenerate`, {
+      method: 'POST',
+    }),
+
   // Providers
   listProviders: () =>
     request<{ providers: Provider[] }>('/api/admin/providers'),

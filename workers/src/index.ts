@@ -5,7 +5,7 @@ import { handleEmbeddings } from './handlers/embeddings';
 import { handleListModels } from './handlers/models';
 import {
   handleAdminLogin, handleAdminLogout,
-  handleListKeys, handleCreateKey, handleDeleteKey, handlePatchKey,
+  handleListKeys, handleCreateKey, handleDeleteKey, handlePatchKey, handleRegenerateKey,
   handleListProviders, handleCreateProvider, handleDeleteProvider, handlePatchProvider,
   handleFetchProviderModels,
   handleListProviderKeys, handleCreateProviderAPIKey, handleDeleteProviderAPIKey,
@@ -81,6 +81,7 @@ app.get('/api/admin/keys', handleListKeys);
 app.post('/api/admin/keys', handleCreateKey);
 app.delete('/api/admin/keys/:id', handleDeleteKey);
 app.patch('/api/admin/keys/:id', handlePatchKey);
+app.post('/api/admin/keys/:id/regenerate', handleRegenerateKey);
 
 // Providers
 app.get('/api/admin/providers', handleListProviders);

@@ -21,7 +21,12 @@ export default function ApiKeys() {
     message: string;
     onConfirm: () => void;
     danger?: boolean;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Model selection state: map of model alias -> selected
   const [selectedModels, setSelectedModels] = useState<Record<string, boolean>>({});
@@ -43,11 +48,13 @@ export default function ApiKeys() {
         setModels(mRes.models);
         setProviders(pRes.providers);
       })
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +81,13 @@ export default function ApiKeys() {
       setShowKeyModal({ key: result.key_value, name: form.name });
       setSelectedModels({});
       setSelectAllModels(false);
-      setForm({ name: '', provider: 'openai', api_secret: '', embeddings_model: '', rate_limit: 60 });
+      setForm({
+        name: '',
+        provider: 'openai',
+        api_secret: '',
+        embeddings_model: '',
+        rate_limit: 60,
+      });
       loadData();
     } catch (err) {
       setError((err as Error).message);
@@ -89,7 +102,7 @@ export default function ApiKeys() {
       onConfirm: async () => {
         await adminApi.deleteKey(id);
         loadData();
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
       },
       danger: true,
     });
@@ -108,25 +121,18 @@ export default function ApiKeys() {
       onConfirm: async () => {
         setError('');
         try {
-          const existing = keys.find(k => k.id === id);
-          const result = await adminApi.createKey({
-            name: `${name} (new)`,
-            provider: existing?.provider || 'openai',
-            model: '*',
-            allowed_models: (existing as any)?.allowed_models || [],
-            api_secret: 'regenerate',
-            rate_limit: existing?.rate_limit || 60,
-          });
+          const result = await adminApi.regenerateKey(id);
           setShowKeyModal({ key: result.key_value, name: `${name} (已重新生成)` });
           loadData();
         } catch (err) {
           setError((err as Error).message);
         }
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
       },
       danger: true,
     });
   };
+
   const handleUpdateModels = async (id: string, allowed_models: string[]) => {
     try {
       await (adminApi as any).updateKey(id, { allowed_models });
@@ -143,22 +149,29 @@ export default function ApiKeys() {
   };
 
   const getProviderName = (providerId: string) => {
-    return providers.find(p => p.id === providerId)?.display_name || providers.find(p => p.id === providerId)?.name || providerId;
+    return (
+      providers.find((p) => p.id === providerId)?.display_name ||
+      providers.find((p) => p.id === providerId)?.name ||
+      providerId
+    );
   };
 
   // Get model display name
   const getModelDisplay = (alias: string) => {
-    const m = models.find(m => m.alias === alias);
+    const m = models.find((m) => m.alias === alias);
     return m?.display_name || m?.alias || alias;
   };
 
   // Models grouped by provider
-  const modelsByProvider = models.reduce((acc, m) => {
-    const pid = m.provider_id;
-    if (!acc[pid]) acc[pid] = [];
-    acc[pid].push(m);
-    return acc;
-  }, {} as Record<string, CustomModel[]>);
+  const modelsByProvider = models.reduce(
+    (acc, m) => {
+      const pid = m.provider_id;
+      if (!acc[pid]) acc[pid] = [];
+      acc[pid].push(m);
+      return acc;
+    },
+    {} as Record<string, CustomModel[]>
+  );
 
   return (
     <div>
@@ -172,7 +185,9 @@ export default function ApiKeys() {
         </button>
       </div>
 
-      {error && <div className="text-red-500 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</div>}
+      {error && (
+        <div className="text-red-500 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</div>
+      )}
 
       {loading ? (
         <div className="text-gray-400">{t('common.loading')}</div>
@@ -184,9 +199,10 @@ export default function ApiKeys() {
         </div>
       ) : (
         <div className="space-y-3">
-          {keys.map(key => {
+          {keys.map((key) => {
             const allowed: string[] = (key as any).allowed_models || [];
             const isAll = allowed.length === 0;
+
             return (
               <div key={key.id} className="card">
                 <div className="flex items-start justify-between">
@@ -206,20 +222,51 @@ export default function ApiKeys() {
                       <span className={isAll ? 'text-green-600 font-medium' : 'text-gray-500'}>
                         {isAll ? '✅ 全部模型' : `${allowed.length} 个模型`}
                       </span>
-                      {isAll ? '' : ` (${allowed.slice(0, 3).map(getModelDisplay).join(', ')}${allowed.length > 3 ? '...' : ''})`}
+                      {isAll
+                        ? ''
+                        : ` (${allowed
+                            .slice(0, 3)
+                            .map(getModelDisplay)
+                            .join(', ')}${allowed.length > 3 ? '...' : ''})`}
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4 flex-wrap justify-end">
-                    <button onClick={() => copyKey(key.key_prefix + 'xxxxxxxxxxxxxxxxxxxxxxxx')} className="btn-secondary text-xs py-1 px-3" title="复制 Key">
+                    <button
+                      onClick={() => {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: '无法复制旧密钥',
+                          message: '密钥只在创建时显示一次，已无法获取。请点击「重新生成」来生成新密钥。',
+                          onConfirm: () => setConfirmDialog((prev) => ({ ...prev, isOpen: false })),
+                          danger: false,
+                        });
+                      }}
+                      className="btn-secondary text-xs py-1 px-3 opacity-50"
+                      title="密钥已不可见"
+                    >
                       📋 复制
                     </button>
-                    <button onClick={() => handleRegenerate(key.id, key.name)} className="btn-secondary text-xs py-1 px-3" title="重新生成">
+                    <button
+                      onClick={() => handleRegenerate(key.id, key.name)}
+                      className="btn-secondary text-xs py-1 px-3"
+                      title="重新生成"
+                    >
                       🔄 重新生成
                     </button>
-                    <button onClick={() => handleToggle(key.id, key.enabled)} className={`text-xs py-1 px-3 rounded border ${key.enabled ? 'border-orange-300 text-orange-500 hover:bg-orange-50' : 'border-green-300 text-green-500 hover:bg-green-50'}`}>
+                    <button
+                      onClick={() => handleToggle(key.id, key.enabled)}
+                      className={`text-xs py-1 px-3 rounded border ${
+                        key.enabled
+                          ? 'border-orange-300 text-orange-500 hover:bg-orange-50'
+                          : 'border-green-300 text-green-500 hover:bg-green-50'
+                      }`}
+                    >
                       {key.enabled ? '⏸ 禁用' : '▶ 启用'}
                     </button>
-                    <button onClick={() => handleDelete(key.id)} className="text-red-500 text-xs hover:underline py-1 px-3">
+                    <button
+                      onClick={() => handleDelete(key.id)}
+                      className="text-red-500 text-xs hover:underline py-1 px-3"
+                    >
                       {t('common.delete')}
                     </button>
                   </div>
@@ -238,14 +285,14 @@ export default function ApiKeys() {
                   </div>
                   {!isAll && (
                     <div className="flex flex-wrap gap-2">
-                      {models.map(m => {
+                      {models.map((m) => {
                         const sel = allowed.includes(m.alias);
                         return (
                           <button
                             key={m.alias}
                             onClick={() => {
                               const newAllowed = sel
-                                ? allowed.filter(a => a !== m.alias)
+                                ? allowed.filter((a) => a !== m.alias)
                                 : [...allowed, m.alias];
                               handleUpdateModels(key.id, newAllowed);
                             }}
@@ -282,7 +329,14 @@ export default function ApiKeys() {
               {showKeyModal.key}
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { copyKey(showKeyModal.key); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="btn-primary flex-1">
+              <button
+                onClick={() => {
+                  copyKey(showKeyModal.key);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="btn-primary flex-1"
+              >
                 {copied ? '✅ 已复制' : '📋 复制 Key'}
               </button>
               <button onClick={() => setShowKeyModal(null)} className="btn-secondary flex-1">
@@ -301,35 +355,76 @@ export default function ApiKeys() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
               💡 填写你的上游 API Key（系统会为你生成一个对外使用的代理 Key），并选择此 Key 允许访问哪些模型
             </div>
-            {error && <div className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded">{error}</div>}
+
+            {error && (
+              <div className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded">{error}</div>
+            )}
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Key 名称</label>
-                  <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral" placeholder="我的 Gemini Key" required />
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                    placeholder="我的 Gemini Key"
+                    required
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">提供商</label>
-                  <select value={form.provider} onChange={e => setForm({ ...form, provider: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral">
-                    {providers.map(p => <option key={p.id} value={p.name}>{p.display_name || p.name}</option>)}
+                  <select
+                    value={form.provider}
+                    onChange={(e) => setForm({ ...form, provider: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                  >
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.display_name || p.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">上游 API Key</label>
-                <input type="password" value={form.api_secret} onChange={e => setForm({ ...form, api_secret: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="sk-..." required />
+                <input
+                  type="password"
+                  value={form.api_secret}
+                  onChange={(e) => setForm({ ...form, api_secret: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm"
+                  placeholder="sk-..."
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Embedding 模型 <span className="text-gray-400 text-xs">（可选）</span></label>
-                  <input type="text" value={form.embeddings_model} onChange={e => setForm({ ...form, embeddings_model: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral" placeholder="可选" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Embedding 模型 <span className="text-gray-400 text-xs">（可选）</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.embeddings_model}
+                    onChange={(e) => setForm({ ...form, embeddings_model: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                    placeholder="可选"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.rate_limit')}</label>
-                  <input type="number" value={form.rate_limit} onChange={e => setForm({ ...form, rate_limit: parseInt(e.target.value) || 60 })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral" min={1} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('keys.rate_limit')}
+                  </label>
+                  <input
+                    type="number"
+                    value={form.rate_limit}
+                    onChange={(e) => setForm({ ...form, rate_limit: parseInt(e.target.value) || 60 })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                    min={1}
+                  />
                 </div>
               </div>
 
@@ -340,11 +435,16 @@ export default function ApiKeys() {
                   <button
                     type="button"
                     onClick={() => setSelectAllModels(!selectAllModels)}
-                    className={`text-xs px-3 py-1 rounded border transition-colors ${selectAllModels ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-500 hover:border-coral'}`}
+                    className={`text-xs px-3 py-1 rounded border transition-colors ${
+                      selectAllModels
+                        ? 'bg-green-500 text-white border-green-500'
+                        : 'border-gray-300 text-gray-500 hover:border-coral'
+                    }`}
                   >
                     {selectAllModels ? '✅ 全部模型（已选）' : '选择全部模型'}
                   </button>
                 </div>
+
                 {models.length === 0 ? (
                   <div className="text-sm text-gray-400 bg-gray-50 rounded-lg p-4 text-center">
                     暂无自定义模型，请先在「Models」页面添加模型
@@ -355,22 +455,27 @@ export default function ApiKeys() {
                       const pName = getProviderName(providerId);
                       return (
                         <div key={providerId}>
-                          <div className="text-xs font-medium text-gray-400 mb-1 uppercase">{pName}</div>
+                          <div className="text-xs font-medium text-gray-400 mb-1 uppercase">
+                            {pName}
+                          </div>
                           <div className="flex flex-wrap gap-1">
-                            {mList.map(m => (
+                            {mList.map((m) => (
                               <button
                                 type="button"
                                 key={m.alias}
                                 onClick={() => {
                                   if (selectAllModels) return;
-                                  setSelectedModels(prev => ({ ...prev, [m.alias]: !prev[m.alias] }));
+                                  setSelectedModels((prev) => ({
+                                    ...prev,
+                                    [m.alias]: !prev[m.alias],
+                                  }));
                                 }}
                                 className={`text-xs px-2 py-1 rounded border transition-colors ${
                                   selectAllModels
                                     ? 'bg-green-500 text-white border-green-500'
                                     : selectedModels[m.alias]
-                                    ? 'bg-coral text-white border-coral'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:border-coral'
+                                      ? 'bg-coral text-white border-coral'
+                                      : 'bg-white text-gray-600 border-gray-200 hover:border-coral'
                                 }`}
                               >
                                 {m.display_name || m.alias}
@@ -382,6 +487,7 @@ export default function ApiKeys() {
                     })}
                   </div>
                 )}
+
                 {Object.values(selectedModels).some(Boolean) && !selectAllModels && (
                   <div className="text-xs text-coral mt-1">
                     已选择 {Object.values(selectedModels).filter(Boolean).length} 个模型
@@ -390,8 +496,18 @@ export default function ApiKeys() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="btn-primary flex-1">{t('common.create')}</button>
-                <button type="button" onClick={() => { setShowCreate(false); setSelectedModels({}); setSelectAllModels(false); }} className="btn-secondary flex-1">
+                <button type="submit" className="btn-primary flex-1">
+                  {t('common.create')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreate(false);
+                    setSelectedModels({});
+                    setSelectAllModels(false);
+                  }}
+                  className="btn-secondary flex-1"
+                >
                   {t('common.cancel')}
                 </button>
               </div>
@@ -405,7 +521,7 @@ export default function ApiKeys() {
         title={confirmDialog.title}
         message={confirmDialog.message}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
         confirmText="确认"
         cancelText="取消"
         danger={confirmDialog.danger}
