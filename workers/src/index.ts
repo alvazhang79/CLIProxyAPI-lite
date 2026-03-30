@@ -88,6 +88,10 @@ app.post('/api/admin/providers', handleCreateProvider);
 app.patch('/api/admin/providers/:id', handlePatchProvider);
 app.delete('/api/admin/providers/:id', handleDeleteProvider);
 app.post('/api/admin/providers/:id/models', handleFetchProviderModels);
+app.post('/api/admin/test-body', async (c) => {
+  const raw = await c.req.text();
+  return c.json({ raw_len: raw.length, raw: raw.slice(0, 100) });
+});
 app.get('/api/admin/providers/:id/keys', handleListProviderKeys);
 app.post('/api/admin/providers/:id/keys', handleCreateProviderAPIKey);
 app.delete('/api/admin/providers/:id/keys/:keyId', handleDeleteProviderAPIKey);
