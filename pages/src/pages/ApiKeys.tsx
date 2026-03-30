@@ -14,6 +14,7 @@ export default function ApiKeys() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
+  const [updatingModel, setUpdatingModel] = useState<string | null>(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -54,9 +55,9 @@ export default function ApiKeys() {
   const loadData = () => {
     Promise.all([adminApi.listKeys(), adminApi.listModels(), adminApi.listProviders()])
       .then(([kRes, mRes, pRes]) => {
-        setKeys(kRes.keys);
-        setModels(mRes.models);
-        setProviders(pRes.providers);
+        setKeys(kRes.keys || []);
+        setModels(mRes.models || []);
+        setProviders(pRes.providers || []);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -70,7 +71,6 @@ export default function ApiKeys() {
     e.preventDefault();
     setError('');
 
-    // Determine allowed_models
     const allowedModels: string[] = selectAllModels
       ? []
       : Object.entries(selectedModels)
@@ -81,7 +81,7 @@ export default function ApiKeys() {
       const result = await adminApi.createKey({
         name: form.name,
         provider: form.provider,
-        model: '*', // wildcard when allowed_models is set
+        model: '*',
         allowed_models: allowedModels,
         api_secret: form.api_secret || 'placeholder',
         embeddings_model: form.embeddings_model || undefined,
@@ -144,11 +144,16 @@ export default function ApiKeys() {
   };
 
   const handleUpdateModels = async (id: string, allowed_models: string[]) => {
+    setUpdatingModel(id);
+    setError('');
     try {
       await (adminApi as any).updateKey(id, { allowed_models });
       loadData();
     } catch (err) {
       setError((err as Error).message);
+      console.error('Failed to update models:', err);
+    } finally {
+      setUpdatingModel(null);
     }
   };
 
@@ -166,13 +171,11 @@ export default function ApiKeys() {
     );
   };
 
-  // Get model display name
   const getModelDisplay = (alias: string) => {
     const m = models.find((m) => m.alias === alias);
     return m?.display_name || m?.alias || alias;
   };
 
-  // Models grouped by provider
   const modelsByProvider = models.reduce(
     (acc, m) => {
       const pid = m.provider_id;
@@ -182,6 +185,13 @@ export default function ApiKeys() {
     },
     {} as Record<string, CustomModel[]>
   );
+
+  // 安全获取 allowed_models
+  const getAllowedModels = (key: APIKey): string[] => {
+    const allowed = (key as any).allowed_models;
+    if (!allowed || !Array.isArray(allowed)) return [];
+    return allowed.filter((a: any) => typeof a === 'string');
+  };
 
   return (
     <div>
@@ -210,7 +220,7 @@ export default function ApiKeys() {
       ) : (
         <div className="space-y-3">
           {keys.map((key) => {
-            const allowed: string[] = (key as any).allowed_models || [];
+            const allowed = getAllowedModels(key);
             const isAll = allowed.length === 0;
 
             return (
@@ -288,34 +298,40 @@ export default function ApiKeys() {
                     <span className="text-xs font-medium text-gray-500">允许的模型:</span>
                     <button
                       onClick={() => handleUpdateModels(key.id, isAll ? ['*'] : [])}
-                      className="text-xs text-coral hover:underline"
+                      disabled={updatingModel === key.id}
+                      className="text-xs text-coral hover:underline disabled:opacity-50"
                     >
-                      {isAll ? '切换为选择特定模型' : '设为全部模型'}
+                      {updatingModel === key.id ? '更新中...' : isAll ? '切换为选择特定模型' : '设为全部模型'}
                     </button>
                   </div>
                   {!isAll && (
                     <div className="flex flex-wrap gap-2">
-                      {models.map((m) => {
-                        const sel = allowed.includes(m.alias);
-                        return (
-                          <button
-                            key={m.alias}
-                            onClick={() => {
-                              const newAllowed = sel
-                                ? allowed.filter((a) => a !== m.alias)
-                                : [...allowed, m.alias];
-                              handleUpdateModels(key.id, newAllowed);
-                            }}
-                            className={`text-xs px-2 py-1 rounded border transition-colors ${
-                              sel
-                                ? 'bg-coral text-white border-coral'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-coral'
-                            }`}
-                          >
-                            {m.display_name || m.alias}
-                          </button>
-                        );
-                      })}
+                      {models.length === 0 ? (
+                        <span className="text-xs text-gray-400">暂无模型</span>
+                      ) : (
+                        models.map((m) => {
+                          const sel = allowed.includes(m.alias);
+                          return (
+                            <button
+                              key={m.alias}
+                              onClick={() => {
+                                const newAllowed = sel
+                                  ? allowed.filter((a) => a !== m.alias)
+                                  : [...allowed, m.alias];
+                                handleUpdateModels(key.id, newAllowed);
+                              }}
+                              disabled={updatingModel === key.id}
+                              className={`text-xs px-2 py-1 rounded border transition-colors disabled:opacity-50 ${
+                                sel
+                                  ? 'bg-coral text-white border-coral'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-coral'
+                              }`}
+                            >
+                              {m.display_name || m.alias}
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>
