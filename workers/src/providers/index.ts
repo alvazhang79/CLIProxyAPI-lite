@@ -120,16 +120,65 @@ export async function getProviderForAPIKey(
       throw new APIError(400, 'model_not_found', `Model ${keyRecord.model} not found`, detectLang(null));
     }
   } else {
-    route = resolveBuiltinModel(keyRecord.model);
-    if (!route) {
-      // Try generic openai-compatible
-      route = {
-        provider: keyRecord.provider as 'openai',
-        upstream_model: keyRecord.model,
-        api_format: 'openai',
-        supports_streaming: true,
-        supports_functions: true,
+    // First check if it's a custom provider by name (not just by "custom:" prefix)
+    const customByName = d1.prepare(
+      'SELECT * FROM custom_providers WHERE name = ? AND enabled = 1 LIMIT 1'
+    ).bind(keyRecord.provider).first().catch(() => null) as Record<string, unknown> | null;
+
+    if (customByName) {
+      customProvider = {
+        id: customByName.id as string,
+        name: customByName.name as string,
+        display_name: customByName.display_name as string,
+        base_url: customByName.base_url as string,
+        auth_type: customByName.auth_type as 'bearer' | 'api_key' | 'custom',
+        auth_header: customByName.auth_header as string,
+        headers: customByName.headers ? JSON.parse(customByName.headers as string) : {},
+        proxy_url: (customByName.proxy_url as string) ?? '',
+        encrypted_credentials: (customByName.encrypted_credentials as string) ?? '',
+        enabled: Boolean(customByName.enabled),
+        created_at: customByName.created_at as number,
+        updated_at: customByName.updated_at as number,
       };
+
+      // Look up model from custom_models
+      const modelStmt = d1.prepare(
+        'SELECT * FROM custom_models WHERE alias = ? AND provider_id = ? AND enabled = 1 LIMIT 1'
+      );
+      const mr = await modelStmt.bind(keyRecord.model, customProvider.id).first().catch(() => null) as Record<string, unknown> | null;
+
+      route = mr
+        ? {
+            provider: customProvider,
+            upstream_model: mr.model as string,
+            api_format: (mr.api_format as 'openai') ?? 'openai',
+            supports_streaming: Boolean(mr.supports_streaming),
+            supports_functions: Boolean(mr.supports_functions),
+          }
+        : resolveBuiltinModel(keyRecord.model);
+
+      if (!route) {
+        // Generic openai-compatible for custom provider
+        route = {
+          provider: customProvider,
+          upstream_model: keyRecord.model,
+          api_format: 'openai',
+          supports_streaming: true,
+          supports_functions: true,
+        };
+      }
+    } else {
+      route = resolveBuiltinModel(keyRecord.model);
+      if (!route) {
+        // Try generic openai-compatible
+        route = {
+          provider: keyRecord.provider as 'openai',
+          upstream_model: keyRecord.model,
+          api_format: 'openai',
+          supports_streaming: true,
+          supports_functions: true,
+        };
+      }
     }
   }
 
