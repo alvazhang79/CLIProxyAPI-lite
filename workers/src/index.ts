@@ -92,6 +92,17 @@ app.post('/api/admin/test-body', async (c) => {
   const raw = await c.req.text();
   return c.json({ raw_len: raw.length, raw: raw.slice(0, 100) });
 });
+// Debug: mimic handleFetchProviderModels body parsing exactly
+app.post('/api/admin/test-handler', async (c) => {
+  const id = c.req.param('id');
+  let body = null;
+  try {
+    const raw = await c.req.text();
+    body = raw ? JSON.parse(raw) : null;
+  } catch { /* body stays null */ }
+  const d1 = c.get('D1');
+  return c.json({ id, body, bodyIsNull: body === null });
+});
 // Debug: catch-all for providers/:id/* to see what path is being hit
 app.all('/api/admin/providers/:id/:path', async (c) => {
   return c.json({ debug: 'catch-all', id: c.req.param('id'), path: c.req.param('path'), method: c.req.method });
