@@ -31,7 +31,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 // (logger removed - it consumes request body making c.req.json() fail)
 app.use('*', cors({
   origin: (origin) => origin, // Must echo back specific origin when credentials: include
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Accept-Language'],
   exposeHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Request-Id'],
   credentials: true, // Required for cross-origin cookie sessions
