@@ -8,6 +8,7 @@ import { getProviderForAPIKey } from '../providers';
 import { rateLimitMiddleware } from '../middleware/ratelimit';
 import { searchEmbeddings } from '../db/embeddings';
 import type { EmbeddingsRequest, EmbeddingsResponse } from '../types/api';
+import { decrypt, type Encrypted } from '../lib/crypto';
 
 const EmbeddingsRequestSchema = z.object({
   model: z.string(),
@@ -68,9 +69,25 @@ export async function handleEmbeddings(c: Context) {
 
   // Otherwise: call upstream embedding API
   const embeddingModel = keyRecord.embeddings_model || model;
+
+  // Decrypt api_secret if it's encrypted (stored as JSON string from encryptSecret)
+  let decryptedApiSecret = keyRecord.api_secret;
+  if (decryptedApiSecret && decryptedApiSecret.startsWith('{')) {
+    try {
+      const enc = JSON.parse(decryptedApiSecret) as Encrypted;
+      const key = c.env.ENCRYPTION_KEY;
+      if (key) {
+        decryptedApiSecret = await decrypt(enc, key);
+      }
+    } catch {
+      // If decryption fails, use as-is (might be plaintext in dev)
+    }
+  }
+
   const { provider } = await getProviderForAPIKey(d1, {
     ...keyRecord,
     model: embeddingModel,
+    api_secret: decryptedApiSecret,
   });
 
   // Call upstream

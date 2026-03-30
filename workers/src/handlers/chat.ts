@@ -10,6 +10,7 @@ import { detectLang } from '../i18n';
 import { getTranslator } from '../translators/index';
 import type { OpenAIRequest, OpenAIResponse } from '../types/api';
 import type { APIFormat } from '../types/provider';
+import { decrypt, type Encrypted } from '../lib/crypto';
 
 // Import all translators (registers them)
 import '../translators/gemini';
@@ -71,10 +72,25 @@ export async function handleChatCompletions(c: Context) {
     throw new APIError(403, 'forbidden', `Model ${resolvedModel} is not allowed with this API key`, lang);
   }
 
+  // Decrypt api_secret if it's encrypted (stored as JSON string from encryptSecret)
+  let decryptedApiSecret = keyRecord.api_secret;
+  if (decryptedApiSecret && decryptedApiSecret.startsWith('{')) {
+    try {
+      const enc = JSON.parse(decryptedApiSecret) as Encrypted;
+      const key = c.env.ENCRYPTION_KEY;
+      if (key) {
+        decryptedApiSecret = await decrypt(enc, key);
+      }
+    } catch {
+      // If decryption fails, use as-is (might be plaintext in dev)
+    }
+  }
+
   // Get provider instance
   const { route, provider } = await getProviderForAPIKey(d1, {
     ...keyRecord,
     model: resolvedModel,
+    api_secret: decryptedApiSecret,
   });
 
   const upstreamModel = route.upstream_model;
