@@ -67,11 +67,15 @@ export default function ApiKeys() {
         // 初始化本地模型选择状态
         const initialSelection: Record<string, Record<string, boolean>> = {};
         loadedKeys.forEach(key => {
-          const allowed = (key as any).allowed_models || [];
+          const allowed = (key as any).allowed_models;
           initialSelection[key.id] = {};
-          allowed.forEach((alias: string) => {
-            initialSelection[key.id][alias] = true;
-          });
+          if (Array.isArray(allowed)) {
+            allowed.forEach((alias: string) => {
+              if (typeof alias === 'string') {
+                initialSelection[key.id][alias] = true;
+              }
+            });
+          }
         });
         setLocalModelSelection(initialSelection);
       })
