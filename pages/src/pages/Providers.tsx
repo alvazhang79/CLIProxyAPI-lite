@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi, type Provider } from '../lib/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Providers() {
   const { t } = useTranslation();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    danger?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [error, setError] = useState('');
   const [advancedProvider, setAdvancedProvider] = useState<string | null>(null);
 
@@ -210,6 +220,17 @@ export default function Providers() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        confirmText="确认"
+        cancelText="取消"
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }

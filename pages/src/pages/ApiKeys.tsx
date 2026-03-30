@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi, type APIKey, type CustomModel, type CustomProvider } from '../lib/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function ApiKeys() {
   const { t } = useTranslation();
@@ -12,6 +13,15 @@ export default function ApiKeys() {
   const [showKeyModal, setShowKeyModal] = useState<{ key: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    danger?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Model selection state: map of model alias -> selected
   const [selectedModels, setSelectedModels] = useState<Record<string, boolean>>({});
@@ -72,9 +82,17 @@ export default function ApiKeys() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('keys.confirm_delete'))) return;
-    await adminApi.deleteKey(id);
-    loadData();
+    setConfirmDialog({
+      isOpen: true,
+      title: t('keys.confirm_delete') || '确认删除',
+      message: '确定要删除这个 API Key 吗？此操作无法撤销。',
+      onConfirm: async () => {
+        await adminApi.deleteKey(id);
+        loadData();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      danger: true,
+    });
   };
 
   const handleToggle = async (id: string, enabled: boolean) => {
@@ -83,25 +101,32 @@ export default function ApiKeys() {
   };
 
   const handleRegenerate = async (id: string, name: string) => {
-    if (!confirm('重新生成此 Key？旧 Key 将立即失效！')) return;
-    setError('');
-    try {
-      const existing = keys.find(k => k.id === id);
-      const result = await adminApi.createKey({
-        name: `${name} (new)`,
-        provider: existing?.provider || 'openai',
-        model: '*',
-        allowed_models: (existing as any)?.allowed_models || [],
-        api_secret: 'regenerate',
-        rate_limit: existing?.rate_limit || 60,
-      });
-      setShowKeyModal({ key: result.key_value, name: `${name} (已重新生成)` });
-      loadData();
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: '重新生成 Key',
+      message: '重新生成此 Key？旧 Key 将立即失效！',
+      onConfirm: async () => {
+        setError('');
+        try {
+          const existing = keys.find(k => k.id === id);
+          const result = await adminApi.createKey({
+            name: `${name} (new)`,
+            provider: existing?.provider || 'openai',
+            model: '*',
+            allowed_models: (existing as any)?.allowed_models || [],
+            api_secret: 'regenerate',
+            rate_limit: existing?.rate_limit || 60,
+          });
+          setShowKeyModal({ key: result.key_value, name: `${name} (已重新生成)` });
+          loadData();
+        } catch (err) {
+          setError((err as Error).message);
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      danger: true,
+    });
   };
-
   const handleUpdateModels = async (id: string, allowed_models: string[]) => {
     try {
       await (adminApi as any).updateKey(id, { allowed_models });
@@ -374,6 +399,17 @@ export default function ApiKeys() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        confirmText="确认"
+        cancelText="取消"
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }

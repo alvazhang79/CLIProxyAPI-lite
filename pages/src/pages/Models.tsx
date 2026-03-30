@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi, type CustomModel, type CustomProvider } from '../lib/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 // Preset quick-import lists
 const PRESET_MODELS: Record<string, { model: string; alias: string; display_name: string; context_window?: number }[]> = {
@@ -28,6 +29,15 @@ export default function Models() {
   const [providers, setProviders] = useState<CustomProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    danger?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [error, setError] = useState('');
   const [importing, setImporting] = useState(false);
@@ -84,9 +94,17 @@ export default function Models() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('common.confirm_delete'))) return;
-    await adminApi.deleteModel(id);
-    loadData();
+    setConfirmDialog({
+      isOpen: true,
+      title: t('common.confirm_delete') || '确认删除',
+      message: '确定要删除这个模型吗？此操作无法撤销。',
+      onConfirm: async () => {
+        await adminApi.deleteModel(id);
+        loadData();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      danger: true,
+    });
   };
 
   // Fetch models from upstream provider API via Workers proxy
@@ -512,6 +530,17 @@ export default function Models() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        confirmText="确认"
+        cancelText="取消"
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }

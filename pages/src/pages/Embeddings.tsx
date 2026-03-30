@@ -2,12 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi, type Embedding } from '../lib/api';
 import { formatTimestamp } from '../lib/utils';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Embeddings() {
   const { t } = useTranslation();
   const [results, setResults] = useState<Embedding[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    danger?: boolean;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const load = (query = '') => {
     setLoading(true);
@@ -20,9 +30,17 @@ export default function Embeddings() {
   useEffect(() => { load(); }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this embedding?')) return;
-    await adminApi.deleteEmbedding(id);
-    load(q);
+    setConfirmDialog({
+      isOpen: true,
+      title: '确认删除',
+      message: '确定要删除这个 Embedding 记录吗？',
+      onConfirm: async () => {
+        await adminApi.deleteEmbedding(id);
+        load(q);
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      danger: true,
+    });
   };
 
   return (
@@ -62,6 +80,17 @@ export default function Embeddings() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        confirmText="确认"
+        cancelText="取消"
+        danger={confirmDialog.danger}
+      />
     </div>
   );
 }
