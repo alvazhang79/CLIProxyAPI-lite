@@ -10,11 +10,12 @@ export default function ApiKeys() {
   const [providers, setProviders] = useState<CustomProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [showKeyModal, setShowKeyModal] = useState<{ key: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
-  const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
-  const [updatingModel, setUpdatingModel] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // 本地模型选择状态：keyId -> alias -> selected
+  const [localModelSelection, setLocalModelSelection] = useState<Record<string, Record<string, boolean>>>({});
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -30,10 +31,6 @@ export default function ApiKeys() {
     onConfirm: () => {},
   });
 
-  // Model selection state: map of model alias -> selected
-  const [selectedModels, setSelectedModels] = useState<Record<string, boolean>>({});
-  const [selectAllModels, setSelectAllModels] = useState(false);
-
   // Create form state
   const [form, setForm] = useState({
     name: '',
@@ -42,6 +39,10 @@ export default function ApiKeys() {
     embeddings_model: '',
     rate_limit: 60,
   });
+
+  // Model selection in create dialog
+  const [selectedModels, setSelectedModels] = useState<Record<string, boolean>>({});
+  const [selectAllModels, setSelectAllModels] = useState(false);
 
   // Generate random API key
   const generateApiKey = () => {
@@ -55,9 +56,24 @@ export default function ApiKeys() {
   const loadData = () => {
     Promise.all([adminApi.listKeys(), adminApi.listModels(), adminApi.listProviders()])
       .then(([kRes, mRes, pRes]) => {
-        setKeys(kRes.keys || []);
-        setModels(mRes.models || []);
-        setProviders(pRes.providers || []);
+        const loadedKeys = kRes.keys || [];
+        const loadedModels = mRes.models || [];
+        const loadedProviders = pRes.providers || [];
+        
+        setKeys(loadedKeys);
+        setModels(loadedModels);
+        setProviders(loadedProviders);
+        
+        // 初始化本地模型选择状态
+        const initialSelection: Record<string, Record<string, boolean>> = {};
+        loadedKeys.forEach(key => {
+          const allowed = (key as any).allowed_models || [];
+          initialSelection[key.id] = {};
+          allowed.forEach((alias: string) => {
+            initialSelection[key.id][alias] = true;
+          });
+        });
+        setLocalModelSelection(initialSelection);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -87,8 +103,12 @@ export default function ApiKeys() {
         embeddings_model: form.embeddings_model || undefined,
         rate_limit: form.rate_limit,
       });
+      
       setShowCreate(false);
-      setShowKeyModal({ key: result.key_value, name: form.name });
+      navigator.clipboard.writeText(result.key_value);
+      setSuccessMsg('API Key 已创建并复制到剪贴板：\n' + result.key_value);
+      setTimeout(() => setSuccessMsg(''), 5000);
+      
       setSelectedModels({});
       setSelectAllModels(false);
       setForm({
@@ -110,8 +130,12 @@ export default function ApiKeys() {
       title: t('keys.confirm_delete') || '确认删除',
       message: '确定要删除这个 API Key 吗？此操作无法撤销。',
       onConfirm: async () => {
-        await adminApi.deleteKey(id);
-        loadData();
+        try {
+          await adminApi.deleteKey(id);
+          loadData();
+        } catch (err) {
+          setError((err as Error).message);
+        }
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
       },
       danger: true,
@@ -119,8 +143,12 @@ export default function ApiKeys() {
   };
 
   const handleToggle = async (id: string, enabled: boolean) => {
-    await adminApi.toggleKey(id, !enabled);
-    loadData();
+    try {
+      await adminApi.toggleKey(id, !enabled);
+      loadData();
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   const handleRegenerate = async (id: string, name: string) => {
@@ -132,9 +160,9 @@ export default function ApiKeys() {
         setError('');
         try {
           const result = await adminApi.regenerateKey(id);
-          // 直接复制到剪贴板
           navigator.clipboard.writeText(result.key_value);
-          alert('✅ 密钥已重新生成！\n\n新密钥已复制到剪贴板：\n' + result.key_value + '\n\n请妥善保存，此密钥只显示一次。');
+          setSuccessMsg('密钥已重新生成并复制到剪贴板：\n' + result.key_value);
+          setTimeout(() => setSuccessMsg(''), 5000);
           loadData();
         } catch (err) {
           setError((err as Error).message);
@@ -145,17 +173,64 @@ export default function ApiKeys() {
     });
   };
 
-  const handleUpdateModels = async (id: string, allowed_models: string[]) => {
-    setUpdatingModel(id);
-    setError('');
+  // 切换单个模型选择状态（本地 + API）
+  const handleToggleModel = async (keyId: string, alias: string, isCurrentlySelected: boolean) => {
+    // 先更新本地状态
+    setLocalModelSelection(prev => {
+      const keyState = prev[keyId] || {};
+      return {
+        ...prev,
+        [keyId]: {
+          ...keyState,
+          [alias]: !isCurrentlySelected
+        }
+      };
+    });
+
+    // 计算新的 allowed_models
+    const currentAllowed = Object.entries(localModelSelection[keyId] || {})
+      .filter(([a, sel]) => sel)
+      .map(([a]) => a);
+    
+    const newAllowed = isCurrentlySelected
+      ? currentAllowed.filter(a => a !== alias)
+      : [...currentAllowed, alias];
+
+    // 调用 API 更新
     try {
-      await (adminApi as any).updateKey(id, { allowed_models });
-      loadData();
+      await (adminApi as any).updateKey(keyId, { allowed_models: newAllowed });
     } catch (err) {
       setError((err as Error).message);
-      console.error('Failed to update models:', err);
-    } finally {
-      setUpdatingModel(null);
+      // 恢复本地状态
+      loadData();
+    }
+  };
+
+  // 设置全部模型或特定模型
+  const handleSetAllModels = async (keyId: string, setAll: boolean) => {
+    if (setAll) {
+      // 设为全部模型（空数组）
+      setLocalModelSelection(prev => ({
+        ...prev,
+        [keyId]: {}
+      }));
+      try {
+        await (adminApi as any).updateKey(keyId, { allowed_models: [] });
+      } catch (err) {
+        setError((err as Error).message);
+        loadData();
+      }
+    } else {
+      // 切换为选择特定模型（保留当前选择）
+      try {
+        const currentAllowed = Object.entries(localModelSelection[keyId] || {})
+          .filter(([, sel]) => sel)
+          .map(([a]) => a);
+        await (adminApi as any).updateKey(keyId, { allowed_models: currentAllowed.length > 0 ? currentAllowed : ['*'] });
+        loadData();
+      } catch (err) {
+        setError((err as Error).message);
+      }
     }
   };
 
@@ -188,8 +263,15 @@ export default function ApiKeys() {
     {} as Record<string, CustomModel[]>
   );
 
-  // 安全获取 allowed_models
+  // 获取 key 的 allowed_models（优先使用本地状态）
   const getAllowedModels = (key: APIKey): string[] => {
+    const localState = localModelSelection[key.id] || {};
+    const localAllowed = Object.entries(localState)
+      .filter(([, sel]) => sel)
+      .map(([a]) => a);
+    
+    if (localAllowed.length > 0) return localAllowed;
+    
     const allowed = (key as any).allowed_models;
     if (!allowed || !Array.isArray(allowed)) return [];
     return allowed.filter((a: any) => typeof a === 'string');
@@ -209,6 +291,10 @@ export default function ApiKeys() {
 
       {error && (
         <div className="text-red-500 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</div>
+      )}
+
+      {successMsg && (
+        <div className="text-green-600 text-sm mb-4 bg-green-50 p-3 rounded-lg whitespace-pre-wrap">{successMsg}</div>
       )}
 
       {loading ? (
@@ -253,21 +339,6 @@ export default function ApiKeys() {
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4 flex-wrap justify-end">
-                    <div className="relative">
-                      <button
-                        onMouseEnter={() => setCopyTooltip(key.id)}
-                        onMouseLeave={() => setCopyTooltip(null)}
-                        className="btn-secondary text-xs py-1 px-3 opacity-50"
-                      >
-                        📋 复制
-                      </button>
-                      {copyTooltip === key.id && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap z-10">
-                          密钥已不可见，请点击「重新生成」
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-                        </div>
-                      )}
-                    </div>
                     <button
                       onClick={() => handleRegenerate(key.id, key.name)}
                       className="btn-secondary text-xs py-1 px-3"
@@ -299,11 +370,10 @@ export default function ApiKeys() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-medium text-gray-500">允许的模型:</span>
                     <button
-                      onClick={() => handleUpdateModels(key.id, isAll ? ['*'] : [])}
-                      disabled={updatingModel === key.id}
-                      className="text-xs text-coral hover:underline disabled:opacity-50"
+                      onClick={() => handleSetAllModels(key.id, !isAll)}
+                      className="text-xs text-coral hover:underline"
                     >
-                      {updatingModel === key.id ? '更新中...' : isAll ? '切换为选择特定模型' : '设为全部模型'}
+                      {isAll ? '切换为选择特定模型' : '设为全部模型'}
                     </button>
                   </div>
                   {!isAll && (
@@ -316,14 +386,8 @@ export default function ApiKeys() {
                           return (
                             <button
                               key={m.alias}
-                              onClick={() => {
-                                const newAllowed = sel
-                                  ? allowed.filter((a) => a !== m.alias)
-                                  : [...allowed, m.alias];
-                                handleUpdateModels(key.id, newAllowed);
-                              }}
-                              disabled={updatingModel === key.id}
-                              className={`text-xs px-2 py-1 rounded border transition-colors disabled:opacity-50 ${
+                              onClick={() => handleToggleModel(key.id, m.alias, sel)}
+                              className={`text-xs px-2 py-1 rounded border transition-colors ${
                                 sel
                                   ? 'bg-coral text-white border-coral'
                                   : 'bg-white text-gray-600 border-gray-200 hover:border-coral'
@@ -343,7 +407,7 @@ export default function ApiKeys() {
         </div>
       )}
 
-      {/* 创建 Key 弹窗 */}{/* 创建 Key 弹窗 */}
+      {/* 创建 Key 弹窗 */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
