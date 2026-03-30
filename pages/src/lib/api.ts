@@ -180,6 +180,7 @@ export interface CreateKeyBody {
   embeddings_model?: string;
   excluded_models?: string;
   rate_limit?: number;
+  allowed_models?: string[];  // allowed model list (empty = all)
 }
 
 export interface CreateKeyResponse {
@@ -210,6 +211,9 @@ export interface Provider {
 
 export interface CustomProvider extends Provider {}
 
+// Aliases for backwards compatibility
+export type CustomModel = Model;
+
 export interface CreateProviderBody {
   name: string;
   display_name: string;
@@ -218,6 +222,7 @@ export interface CreateProviderBody {
   auth_header?: string;
   headers?: Record<string, string>;
   proxy_url?: string;
+  api_key?: string;  // optional provider API key
 }
 
 export interface Model {

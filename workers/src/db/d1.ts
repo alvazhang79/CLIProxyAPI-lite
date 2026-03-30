@@ -5,6 +5,7 @@ import type {
   CustomModel,
   ResolvedRoute,
   APIFormat,
+  ProviderAPIKey,
 } from '../types/provider';
 import type { CachedAPIKey } from '../types/provider';
 
@@ -168,13 +169,41 @@ export async function createCustomProvider(
 ): Promise<boolean> {
   const stmt = d1.prepare(
     'INSERT INTO custom_providers ' +
-    '(id, name, display_name, base_url, auth_type, auth_header, headers, proxy_url, enabled, created_at, updated_at) ' +
-    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    '(id, name, display_name, base_url, auth_type, auth_header, headers, proxy_url, encrypted_credentials, enabled, created_at, updated_at) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const result = await stmt.bind(
     p.id, p.name, p.display_name, p.base_url, p.auth_type, p.auth_header,
-    JSON.stringify(p.headers), p.proxy_url, p.enabled ? 1 : 0, p.created_at, p.updated_at
+    JSON.stringify(p.headers), p.proxy_url, p.encrypted_credentials || '', p.enabled ? 1 : 0, p.created_at, p.updated_at
   ).run();
+  return result.success;
+}
+
+export async function updateCustomProvider(
+  d1: D1Database,
+  id: string,
+  updates: Partial<Pick<CustomProvider, 'display_name' | 'base_url' | 'auth_type' | 'auth_header' | 'headers' | 'proxy_url' | 'encrypted_credentials' | 'enabled'>>,
+): Promise<boolean> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (updates.display_name !== undefined) { fields.push('display_name = ?'); values.push(updates.display_name); }
+  if (updates.base_url !== undefined) { fields.push('base_url = ?'); values.push(updates.base_url); }
+  if (updates.auth_type !== undefined) { fields.push('auth_type = ?'); values.push(updates.auth_type); }
+  if (updates.auth_header !== undefined) { fields.push('auth_header = ?'); values.push(updates.auth_header); }
+  if (updates.headers !== undefined) { fields.push('headers = ?'); values.push(JSON.stringify(updates.headers)); }
+  if (updates.proxy_url !== undefined) { fields.push('proxy_url = ?'); values.push(updates.proxy_url); }
+  if (updates.encrypted_credentials !== undefined) { fields.push('encrypted_credentials = ?'); values.push(updates.encrypted_credentials); }
+  if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
+
+  if (fields.length === 0) return false;
+
+  fields.push('updated_at = ?');
+  values.push(Math.floor(Date.now() / 1000));
+  values.push(id);
+
+  const stmt = d1.prepare('UPDATE custom_providers SET ' + fields.join(', ') + ' WHERE id = ?');
+  const result = await stmt.bind(...values).run();
   return result.success;
 }
 
@@ -188,6 +217,7 @@ function parseCustomProvider(r: Record<string, unknown>): CustomProvider {
     auth_header: r.auth_header as string,
     headers: r.headers ? JSON.parse(r.headers as string) : {},
     proxy_url: (r.proxy_url as string) ?? '',
+    encrypted_credentials: (r.encrypted_credentials as string) ?? '',
     enabled: Boolean(r.enabled),
     created_at: r.created_at as number,
     updated_at: r.updated_at as number,
@@ -434,4 +464,70 @@ export async function getStats(d1: D1Database): Promise<{
       : 0,
     avg_latency_ms: (logsResult?.avg_lat as number) ?? 0,
   };
+}
+
+// ---- Provider API Key Operations (for multi-key load balancing) ----
+
+export async function createProviderAPIKey(
+  d1: D1Database,
+  key: ProviderAPIKey,
+): Promise<boolean> {
+  const stmt = d1.prepare(
+    'INSERT INTO provider_api_keys (id, provider_id, name, api_key, priority, enabled, created_at, updated_at) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  );
+  const result = await stmt.bind(
+    key.id, key.provider_id, key.name, key.api_key,
+    key.priority, key.enabled ? 1 : 0, key.created_at, key.updated_at
+  ).run();
+  return result.success;
+}
+
+export async function listProviderAPIKeys(
+  d1: D1Database,
+  providerId: string,
+): Promise<ProviderAPIKey[]> {
+  const stmt = d1.prepare(
+    'SELECT * FROM provider_api_keys WHERE provider_id = ? ORDER BY priority ASC'
+  );
+  const { results } = await stmt.bind(providerId).all();
+  return results.map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    provider_id: r.provider_id as string,
+    name: r.name as string,
+    api_key: r.api_key as string,
+    priority: r.priority as number,
+    enabled: Boolean(r.enabled),
+    created_at: r.created_at as number,
+    updated_at: r.updated_at as number,
+  }));
+}
+
+export async function deleteProviderAPIKey(
+  d1: D1Database,
+  id: string,
+): Promise<boolean> {
+  const stmt = d1.prepare('DELETE FROM provider_api_keys WHERE id = ?');
+  const result = await stmt.bind(id).run();
+  return result.success;
+}
+
+export async function getEnabledProviderAPIKeys(
+  d1: D1Database,
+  providerId: string,
+): Promise<ProviderAPIKey[]> {
+  const stmt = d1.prepare(
+    'SELECT * FROM provider_api_keys WHERE provider_id = ? AND enabled = 1 ORDER BY priority ASC'
+  );
+  const { results } = await stmt.bind(providerId).all();
+  return results.map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    provider_id: r.provider_id as string,
+    name: r.name as string,
+    api_key: r.api_key as string,
+    priority: r.priority as number,
+    enabled: Boolean(r.enabled),
+    created_at: r.created_at as number,
+    updated_at: r.updated_at as number,
+  }));
 }

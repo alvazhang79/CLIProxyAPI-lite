@@ -160,7 +160,7 @@ export default function ApiKeys() {
       ) : (
         <div className="space-y-3">
           {keys.map(key => {
-            const allowed = (key as any).allowed_models || [];
+            const allowed: string[] = (key as any).allowed_models || [];
             const isAll = allowed.length === 0;
             return (
               <div key={key.id} className="card">

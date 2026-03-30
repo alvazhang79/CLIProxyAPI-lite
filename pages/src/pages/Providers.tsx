@@ -19,6 +19,7 @@ export default function Providers() {
     auth_header: 'Authorization',
     headers: '',
     proxy_url: '',
+    api_key: '',
   });
 
   const loadProviders = () => {
@@ -47,10 +48,11 @@ export default function Providers() {
         auth_header: form.auth_header,
         headers,
         proxy_url: form.proxy_url,
-      });
+        api_key: form.api_key || undefined,
+      } as Parameters<typeof adminApi.createProvider>[0]);
       loadProviders();
       setShowCreate(false);
-      setForm({ name: '', display_name: '', base_url: '', auth_type: 'bearer', auth_header: 'Authorization', headers: '', proxy_url: '' });
+      setForm({ name: '', display_name: '', base_url: '', auth_type: 'bearer', auth_header: 'Authorization', headers: '', proxy_url: '', api_key: '' });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -191,6 +193,11 @@ export default function Providers() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t('providers.proxy')}</label>
                     <input type="text" value={form.proxy_url} onChange={e => setForm({ ...form, proxy_url: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="http://proxy:8080" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Provider API Key <span className="text-gray-400 font-normal">(可选，用于获取模型列表)</span></label>
+                    <input type="password" value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="sk-..." />
                   </div>
                 </div>
               </details>

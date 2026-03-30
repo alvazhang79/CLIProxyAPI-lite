@@ -50,6 +50,7 @@ export default function Models() {
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkImportMode, setBulkImportMode] = useState<'preset' | 'fetch'>('preset');
   const [bulkPreset, setBulkPreset] = useState('');
+  const [bulkApiKey, setBulkApiKey] = useState('');
 
   const loadData = () => {
     Promise.all([adminApi.listModels(), adminApi.listProviders()])
@@ -88,7 +89,7 @@ export default function Models() {
     loadData();
   };
 
-  // Fetch models from upstream provider API
+  // Fetch models from upstream provider API via Workers proxy
   const fetchProviderModels = async (providerId: string) => {
     setFetchingModels(true);
     setFetchedModels([]);
@@ -99,40 +100,22 @@ export default function Models() {
     if (!provider) { setFetchingModels(false); return; }
 
     try {
-      // Try to call the provider's models endpoint
-      const baseUrl = provider.base_url.replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/models`, {
-        headers: {
-          'Authorization': `${provider.auth_header} ${provider.name === 'openai' ? 'dummy' : 'dummy'}`,
-          'Content-Type': 'application/json',
-        },
+      // Call Workers API which proxies to the upstream provider
+      const res = await fetch(`/api/admin/providers/${providerId}/models`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: bulkApiKey || undefined }),
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
-      let modelList: { id: string; display_name: string; created?: number }[] = [];
-
-      // OpenAI format: { data: [{ id: "gpt-4", ... }] }
-      if (data.data && Array.isArray(data.data)) {
-        modelList = data.data.map((m: any) => ({
-          id: m.id,
-          display_name: m.id,
-          created: m.created,
-        }));
-      }
-      // Generic format: just use keys
-      else if (Array.isArray(data)) {
-        modelList = data.map((m: any) => ({
-          id: typeof m === 'string' ? m : m.id || m.name,
-          display_name: typeof m === 'string' ? m : m.display_name || m.id || m.name,
-        }));
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+        throw new Error((err as { message?: string }).message || `HTTP ${res.status}`);
       }
 
-      setFetchedModels(modelList.sort((a, b) => a.id.localeCompare(b.id)));
+      const data = await res.json() as { models: Array<{ id: string; display_name: string; created?: number }> };
+      setFetchedModels((data.models || []).sort((a, b) => a.id.localeCompare(b.id)));
     } catch (err) {
-      // If fetch fails, fall back to preset mode
-      setBulkImportMode('preset');
+      setError((err as Error).message || '获取模型列表失败');
     } finally {
       setFetchingModels(false);
     }
@@ -357,13 +340,22 @@ export default function Models() {
                     {providers.map(p => <option key={p.id} value={p.id}>{p.display_name || p.name} ({p.base_url})</option>)}
                   </select>
                   {bulkProviderId && (
-                    <button
-                      onClick={() => fetchProviderModels(bulkProviderId)}
-                      disabled={fetchingModels}
-                      className="mt-2 btn-secondary text-sm"
-                    >
-                      {fetchingModels ? '获取中...' : '📡 获取模型列表'}
-                    </button>
+                    <>
+                      <input
+                        type="password"
+                        value={bulkApiKey}
+                        onChange={e => setBulkApiKey(e.target.value)}
+                        placeholder="Provider API Key（可选，如已在设置中存储则留空）"
+                        className="mt-2 w-full px-3 py-2 border rounded-lg text-sm"
+                      />
+                      <button
+                        onClick={() => fetchProviderModels(bulkProviderId)}
+                        disabled={fetchingModels}
+                        className="mt-2 btn-secondary text-sm"
+                      >
+                        {fetchingModels ? '获取中...' : '📡 获取模型列表'}
+                      </button>
+                    </>
                   )}
                 </div>
 

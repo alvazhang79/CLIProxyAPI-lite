@@ -94,6 +94,7 @@ export async function getProviderForAPIKey(
       auth_header: r.auth_header as string,
       headers: r.headers ? JSON.parse(r.headers as string) : {},
       proxy_url: (r.proxy_url as string) ?? '',
+      encrypted_credentials: (r.encrypted_credentials as string) ?? '',
       enabled: Boolean(r.enabled),
       created_at: r.created_at as number,
       updated_at: r.updated_at as number,

@@ -17,6 +17,19 @@ export interface CustomProvider {
   auth_header: string;      // e.g. "Authorization" or "X-API-Key"
   headers: Record<string, string>;
   proxy_url: string;
+  encrypted_credentials: string; // encrypted provider API key
+  enabled: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+// Provider API Key for multi-key load balancing
+export interface ProviderAPIKey {
+  id: string;
+  provider_id: string;
+  name: string;
+  api_key: string;         // encrypted
+  priority: number;         // lower = higher priority
   enabled: boolean;
   created_at: number;
   updated_at: number;

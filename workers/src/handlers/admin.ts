@@ -4,8 +4,9 @@ import { APIError } from '../middleware/error';
 import { detectLang } from '../i18n';
 import {
   listAPIKeys, createAPIKey, deleteAPIKey, updateAPIKey,
-  listCustomProviders, createCustomProvider, deleteCustomProvider,
-  listAllModels,
+  listCustomProviders, createCustomProvider, deleteCustomProvider, updateCustomProvider,
+  listAllModels, findCustomProviderById,
+  createProviderAPIKey, listProviderAPIKeys, deleteProviderAPIKey,
   getStats,
 } from '../db/d1';
 import { deleteAdminSession } from '../db/kv';
@@ -232,6 +233,13 @@ export async function handleCreateProvider(c: Context): Promise<Response> {
 
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
+
+  // Encrypt API key if provided
+  let encryptedCredentials = '';
+  if (body.api_key && (body.api_key as string).trim() !== '') {
+    encryptedCredentials = await encryptSecret(c, body.api_key as string);
+  }
+
   await createCustomProvider(d1, {
     id,
     name: body.name as string,
@@ -242,6 +250,7 @@ export async function handleCreateProvider(c: Context): Promise<Response> {
     headers: (typeof body.headers === 'object' && body.headers !== null)
       ? (body.headers as Record<string, string>) : {},
     proxy_url: (body.proxy_url as string) ?? '',
+    encrypted_credentials: encryptedCredentials,
     enabled: true,
     created_at: now,
     updated_at: now,
@@ -256,6 +265,165 @@ export async function handleDeleteProvider(c: Context): Promise<Response> {
   const id = c.req.param('id') as string;
   const d1 = c.get('D1');
   await deleteCustomProvider(d1, id);
+  return c.json({ ok: true });
+}
+
+// ---- PATCH /api/admin/providers/:id ----
+export async function handlePatchProvider(c: Context): Promise<Response> {
+  await authenticateAdmin(c);
+  const id = c.req.param('id') as string;
+  const d1 = c.get('D1');
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body) throw new APIError(400, 'invalid_request', 'Body required', detectLang(c.req.header('accept-language')));
+
+  const provider = await findCustomProviderById(d1, id);
+  if (!provider) throw new APIError(404, 'not_found', 'Provider not found', detectLang(c.req.header('accept-language')));
+
+  const updates: Parameters<typeof updateCustomProvider>[2] = {};
+  if (body.display_name !== undefined) updates.display_name = body.display_name as string;
+  if (body.base_url !== undefined) updates.base_url = body.base_url as string;
+  if (body.auth_type !== undefined) updates.auth_type = body.auth_type as 'bearer' | 'api_key' | 'custom';
+  if (body.auth_header !== undefined) updates.auth_header = body.auth_header as string;
+  if (body.headers !== undefined) updates.headers = body.headers as Record<string, string>;
+  if (body.proxy_url !== undefined) updates.proxy_url = body.proxy_url as string;
+  if (body.enabled !== undefined) updates.enabled = Boolean(body.enabled);
+
+  // Encrypt credentials if provided
+  if (body.api_key !== undefined && body.api_key !== '') {
+    updates.encrypted_credentials = await encryptSecret(c, body.api_key as string);
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await updateCustomProvider(d1, id, updates);
+  }
+
+  const updated = await findCustomProviderById(d1, id);
+  return c.json({ ok: true, provider: updated });
+}
+
+// ---- POST /api/admin/providers/:id/models ----
+export async function handleFetchProviderModels(c: Context): Promise<Response> {
+  await authenticateAdmin(c);
+  const id = c.req.param('id') as string;
+  const d1 = c.get('D1');
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+
+  const provider = await findCustomProviderById(d1, id);
+  if (!provider) throw new APIError(404, 'not_found', 'Provider not found', detectLang(c.req.header('accept-language')));
+
+  // Use provided API key, or decrypt stored credentials
+  const apiKey = (body?.api_key as string) || provider.encrypted_credentials;
+
+  if (!apiKey) {
+    throw new APIError(400, 'invalid_request', 'Provider API key required (provide api_key in body or set it in provider settings)', detectLang(c.req.header('accept-language')));
+  }
+
+  // Decrypt if it's an encrypted string (starts with {)
+  let secret = apiKey;
+  if (apiKey.startsWith('{')) {
+    try {
+      secret = await decryptSecret(c, apiKey);
+    } catch {
+      // Not encrypted, use as-is
+    }
+  }
+
+  const baseUrl = (provider.base_url || '').replace(/\/$/, '');
+  const endpoint = `${baseUrl}/models`;
+
+  let authValue = secret;
+  if (provider.auth_type === 'bearer') {
+    authValue = `Bearer ${secret}`;
+  } else if (provider.auth_type === 'api_key') {
+    authValue = secret;
+  }
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        [provider.auth_header || 'Authorization']: authValue,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new APIError(502, 'upstream_error', `Provider returned ${response.status}: ${text}`, detectLang(c.req.header('accept-language')));
+    }
+
+    const data = await response.json() as Record<string, unknown>;
+    let models: Array<{ id: string; display_name: string; created?: number }> = [];
+
+    // OpenAI format: { data: [{ id: "gpt-4", ... }] }
+    if (data.data && Array.isArray(data.data)) {
+      models = (data.data as Array<Record<string, unknown>>).map(m => ({
+        id: String(m.id ?? ''),
+        display_name: String(m.id ?? ''),
+        created: m.created as number | undefined,
+      }));
+    }
+    // Generic array format
+    else if (Array.isArray(data)) {
+      models = (data as Array<Record<string, unknown>>).map(m => ({
+        id: String(typeof m === 'string' ? m : (m.id ?? m.name ?? '')),
+        display_name: String(typeof m === 'string' ? m : (m.display_name ?? m.name ?? m.id ?? '')),
+        created: m.created as number | undefined,
+      }));
+    }
+
+    return c.json({ models, provider: provider.name });
+  } catch (err) {
+    if (err instanceof APIError) throw err;
+    throw new APIError(502, 'upstream_error', `Failed to fetch models: ${(err as Error).message}`, detectLang(c.req.header('accept-language')));
+  }
+}
+
+// ---- GET /api/admin/providers/:id/keys ----
+export async function handleListProviderKeys(c: Context): Promise<Response> {
+  await authenticateAdmin(c);
+  const id = c.req.param('id') as string;
+  const d1 = c.get('D1');
+  const keys = await listProviderAPIKeys(d1, id);
+  return c.json({ keys });
+}
+
+// ---- POST /api/admin/providers/:id/keys ----
+export async function handleCreateProviderAPIKey(c: Context): Promise<Response> {
+  await authenticateAdmin(c);
+  const id = c.req.param('id') as string;
+  const d1 = c.get('D1');
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body?.name || !body?.api_key) {
+    throw new APIError(400, 'invalid_request', 'name and api_key required', detectLang(c.req.header('accept-language')));
+  }
+
+  const provider = await findCustomProviderById(d1, id);
+  if (!provider) throw new APIError(404, 'not_found', 'Provider not found', detectLang(c.req.header('accept-language')));
+
+  const keyId = crypto.randomUUID();
+  const now = Math.floor(Date.now() / 1000);
+  const encryptedKey = await encryptSecret(c, body.api_key as string);
+
+  await createProviderAPIKey(d1, {
+    id: keyId,
+    provider_id: id,
+    name: body.name as string,
+    api_key: encryptedKey,
+    priority: (body.priority as number) ?? 100,
+    enabled: true,
+    created_at: now,
+    updated_at: now,
+  });
+
+  return c.json({ id: keyId, name: body.name, priority: (body.priority as number) ?? 100 });
+}
+
+// ---- DELETE /api/admin/providers/:id/keys/:keyId ----
+export async function handleDeleteProviderAPIKey(c: Context): Promise<Response> {
+  await authenticateAdmin(c);
+  const { id, keyId } = c.req.param() as { id: string; keyId: string };
+  const d1 = c.get('D1');
+  await deleteProviderAPIKey(d1, keyId);
   return c.json({ ok: true });
 }
 

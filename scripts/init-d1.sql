@@ -126,3 +126,21 @@ INSERT OR IGNORE INTO system_settings (key, value, updated_at) VALUES
     ('maintenance_mode', 'false', CAST(strftime('%s', 'now') AS INTEGER)),
     ('enabled_providers', 'openai,gemini,claude,qwen,cohere', CAST(strftime('%s', 'now') AS INTEGER)),
     ('default_language', 'en', CAST(strftime('%s', 'now') AS INTEGER));
+
+-- ============================================================
+-- Provider API Keys (for multi-key load balancing) ✨
+-- ============================================================
+CREATE TABLE IF NOT EXISTS provider_api_keys (
+    id              TEXT PRIMARY KEY,
+    provider_id     TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    api_key         TEXT NOT NULL,
+    priority        INTEGER DEFAULT 100,
+    enabled         INTEGER DEFAULT 1,
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL,
+    FOREIGN KEY (provider_id) REFERENCES custom_providers(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_api_keys_provider ON provider_api_keys(provider_id);
+CREATE INDEX IF NOT EXISTS idx_provider_api_keys_priority ON provider_api_keys(priority);
