@@ -45,25 +45,28 @@
     "copied": "已复制！"
   },
   "models": {
-    "title": "模型列表",
+    "title": "模型管理",
+    "create": "添加模型",
     "alias": "别名",
     "upstream": "上游模型",
+    "display_name": "显示名称",
     "format": "API 格式",
     "context_window": "上下文窗口",
-    "streaming": "流式响应",
+    "streaming": "流式输出",
     "functions": "函数调用",
-    "yes": "支持",
-    "no": "不支持"
+    "yes": "是",
+    "no": "否"
   },
   "providers": {
-    "title": "提供商",
-    "create": "添加提供商",
+    "title": " Providers",
+    "create": "添加",
     "name": "名称",
     "display_name": "显示名称",
     "base_url": "Base URL",
     "auth_type": "认证方式",
     "headers": "自定义请求头",
-    "proxy": "代理地址"
+    "proxy": "代理地址",
+    "auth_header": "认证 Header"
   },
   "embeddings": {
     "title": "向量索引",
@@ -105,7 +108,8 @@
     "create": "创建",
     "back": "返回",
     "logout": "退出登录",
-    "no_results": "暂无结果"
+    "no_results": "暂无结果",
+    "confirm_delete": "确定要删除吗？"
   },
   "error": {
     "network": "网络错误，请重试。",

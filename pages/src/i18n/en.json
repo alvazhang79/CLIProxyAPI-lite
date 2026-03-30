@@ -53,7 +53,9 @@
     "streaming": "Streaming",
     "functions": "Functions",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "create": "Add Model",
+    "display_name": "Display Name"
   },
   "providers": {
     "title": "Providers",
@@ -63,7 +65,8 @@
     "base_url": "Base URL",
     "auth_type": "Auth Type",
     "headers": "Custom Headers",
-    "proxy": "Proxy URL"
+    "proxy": "Proxy URL",
+    "auth_header": "Auth Header"
   },
   "embeddings": {
     "title": "Embeddings Index",
@@ -105,7 +108,8 @@
     "create": "Create",
     "back": "Back",
     "logout": "Logout",
-    "no_results": "No results"
+    "no_results": "No results",
+    "confirm_delete": "Are you sure you want to delete this?"
   },
   "error": {
     "network": "Network error. Please try again.",

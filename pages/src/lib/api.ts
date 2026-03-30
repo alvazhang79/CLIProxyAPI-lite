@@ -179,17 +179,21 @@ export interface Provider {
   display_name: string;
   base_url: string;
   auth_type: 'bearer' | 'api_key' | 'custom';
+  auth_header: string;
   headers: Record<string, string>;
   proxy_url: string;
   enabled: boolean;
   model_count?: number;
 }
 
+export interface CustomProvider extends Provider {}
+
 export interface CreateProviderBody {
   name: string;
   display_name: string;
   base_url: string;
   auth_type?: 'bearer' | 'api_key' | 'custom';
+  auth_header?: string;
   headers?: Record<string, string>;
   proxy_url?: string;
 }
