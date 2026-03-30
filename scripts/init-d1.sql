@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
     allowed_models  TEXT DEFAULT '[]',
     api_secret      TEXT NOT NULL,
     embeddings_model TEXT,
+    embeddings_provider TEXT,
+    excluded_models     TEXT DEFAULT '[]',
     rate_limit      INTEGER DEFAULT 60,
     enabled         INTEGER DEFAULT 1,
     created_at      INTEGER NOT NULL,
