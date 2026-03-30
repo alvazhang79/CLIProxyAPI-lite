@@ -306,7 +306,13 @@ export async function handleFetchProviderModels(c: Context): Promise<Response> {
   await authenticateAdmin(c);
   const id = c.req.param('id') as string;
   const d1 = c.get('D1');
-  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+  let body: Record<string, unknown> | null = null;
+  try {
+    const raw = await c.req.text();
+    body = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+  } catch {
+    // body stays null
+  }
 
   const provider = await findCustomProviderById(d1, id);
   if (!provider) throw new APIError(404, 'not_found', 'Provider not found', detectLang(c.req.header('accept-language')));
