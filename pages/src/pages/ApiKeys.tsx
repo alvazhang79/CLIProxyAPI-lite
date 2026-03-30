@@ -1,28 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { adminApi, type APIKey, type CreateKeyBody } from '../lib/api';
+import { adminApi, type APIKey } from '../lib/api';
 
 export default function ApiKeys() {
   const { t } = useTranslation();
   const [keys, setKeys] = useState<APIKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
+  const [showKeyModal, setShowKeyModal] = useState<{ key: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
-  const [form, setForm] = useState<CreateKeyBody>({
+  // Create form state
+  const [form, setForm] = useState({
     name: '',
     provider: 'openai',
     model: 'gpt-4o-mini',
     api_secret: '',
-    embeddings_provider: '',
     embeddings_model: '',
-    excluded_models: '',
     rate_limit: 60,
   });
-
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const loadKeys = () => {
     adminApi.listKeys()
@@ -38,15 +35,18 @@ export default function ApiKeys() {
     setError('');
     try {
       const result = await adminApi.createKey({
-        ...form,
+        name: form.name,
+        provider: form.provider,
+        model: form.model,
+        api_secret: form.api_secret || 'dummy', // backend generates real key
         embeddings_model: form.embeddings_model || undefined,
-        excluded_models: form.excluded_models ? form.excluded_models.split(',').map(s => s.trim()).filter(Boolean) : [],
+        rate_limit: form.rate_limit,
       });
-      setNewKeyValue(result.key_value ?? result.key_prefix);
-      loadKeys();
+      // Show the generated key
       setShowCreate(false);
-      setForm({ name: '', provider: 'openai', model: 'gpt-4o-mini', api_secret: '', embeddings_provider: '', embeddings_model: '', excluded_models: '', rate_limit: 60 });
-      setShowAdvanced(false);
+      setShowKeyModal({ key: result.key_value, name: form.name });
+      setForm({ name: '', provider: 'openai', model: 'gpt-4o-mini', api_secret: '', embeddings_model: '', rate_limit: 60 });
+      loadKeys();
     } catch (err) {
       setError((err as Error).message);
     }
@@ -63,123 +63,130 @@ export default function ApiKeys() {
     loadKeys();
   };
 
-  const copyKey = () => {
-    if (!newKeyValue) return;
-    navigator.clipboard.writeText(newKeyValue);
+  const handleRegenerate = async (id: string, name: string) => {
+    if (!confirm('重新生成此 Key？旧 Key 将立即失效！')) return;
+    setError('');
+    try {
+      const result = await adminApi.createKey({
+        name: `${name} (new)`,
+        provider: keys.find(k => k.id === id)?.provider || 'openai',
+        model: keys.find(k => k.id === id)?.model || 'gpt-4o-mini',
+        api_secret: 'regenerate',
+        rate_limit: keys.find(k => k.id === id)?.rate_limit || 60,
+      });
+      // Show the NEW key
+      setShowKeyModal({ key: result.key_value, name: `${name} (已重新生成)` });
+      loadKeys();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const copyKey = (key: string) => {
+    navigator.clipboard.writeText(key);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  // Group keys by provider
-  const groupedKeys = keys.reduce<Record<string, APIKey[]>>((acc, k) => {
-    const p = k.provider || 'other';
-    if (!acc[p]) acc[p] = [];
-    acc[p].push(k);
-    return acc;
-  }, {});
-
-  const providerLabels: Record<string, string> = {
-    openai: '🟢 OpenAI',
-    gemini: '🟡 Google Gemini',
-    claude: '🟣 Anthropic Claude',
-    qwen: '🔵 Alibaba Qwen',
-    cohere: '🔷 Cohere',
-    other: '⚪ Other',
-  };
-
-  const providers = ['openai', 'gemini', 'claude', 'qwen', 'cohere', 'other'];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-navy">{t('keys.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{keys.length} key(s) total</p>
+          <p className="text-sm text-gray-500 mt-1">创建后密钥只显示一次，请妥善保存</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary">
           + {t('keys.create')}
         </button>
       </div>
 
+      {error && <div className="text-red-500 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</div>}
+
       {loading ? (
         <div className="text-gray-400">{t('common.loading')}</div>
       ) : keys.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
-          {t('common.no_results')}
+          <div className="text-4xl mb-4">🔑</div>
+          <div>{t('common.no_results')}</div>
+          <div className="text-sm mt-2">点击右上角「{t('keys.create')}」创建第一个 Key</div>
         </div>
       ) : (
-        <div className="space-y-6">
-          {providers.map(p => {
-            if (!groupedKeys[p]?.length) return null;
-            return (
-              <div key={p} className="card">
-                <h2 className="text-base font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  {providerLabels[p] || p}
-                  <span className="text-xs font-normal text-gray-400">({groupedKeys[p].length})</span>
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="text-left px-4 py-2 text-xs table-header">Name</th>
-                        <th className="text-left px-4 py-2 text-xs table-header">Model</th>
-                        <th className="text-left px-4 py-2 text-xs table-header">Embedding</th>
-                        <th className="text-left px-4 py-2 text-xs table-header">Excluded</th>
-                        <th className="text-left px-4 py-2 text-xs table-header">Rate</th>
-                        <th className="text-left px-4 py-2 text-xs table-header">Status</th>
-                        <th className="text-left px-4 py-2 text-xs table-header">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupedKeys[p].map(key => (
-                        <tr key={key.id} className="table-row border-b last:border-0">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-sm text-gray-800">{key.name}</div>
-                            <div className="text-xs text-gray-400 font-mono">{key.key_prefix}***</div>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-gray-600">{key.model}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                            {key.embeddings_model || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-400">
-                            {key.excluded_models?.length ? `${key.excluded_models.length} models` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-500">{key.rate_limit}/m</td>
-                          <td className="px-4 py-3">
-                            <button onClick={() => handleToggle(key.id, key.enabled)} className={`text-xs px-2 py-1 rounded font-medium ${key.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                              {key.enabled ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button onClick={() => handleDelete(key.id)} className="text-red-500 text-xs hover:underline">
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        <div className="space-y-3">
+          {keys.map(key => (
+            <div key={key.id} className="card">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-semibold text-navy">{key.name}</h3>
+                    <span className="badge-blue capitalize text-xs">{key.provider}</span>
+                    <span className={`badge-sm ${key.enabled ? 'badge-green' : 'badge-red'}`}>
+                      {key.enabled ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                  <div className="font-mono text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block mb-1">
+                    {key.key_prefix}••••••••••
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    模型: {key.model} · 限速: {key.rate_limit}/min
+                  </div>
+                </div>
+                <div className="flex gap-2 ml-4">
+                  <button
+                    onClick={() => copyKey(key.key_prefix + 'xxxxxxxxxxxxxxxxxxxxxxxx')}
+                    className="btn-secondary text-xs py-1 px-3"
+                    title="复制 Key 前缀"
+                  >
+                    📋 复制
+                  </button>
+                  <button
+                    onClick={() => handleRegenerate(key.id, key.name)}
+                    className="btn-secondary text-xs py-1 px-3"
+                    title="重新生成新 Key"
+                  >
+                    🔄 重新生成
+                  </button>
+                  <button
+                    onClick={() => handleToggle(key.id, key.enabled)}
+                    className={`text-xs py-1 px-3 rounded border ${
+                      key.enabled ? 'border-orange-300 text-orange-500 hover:bg-orange-50' : 'border-green-300 text-green-500 hover:bg-green-50'
+                    }`}
+                  >
+                    {key.enabled ? '⏸ 禁用' : '▶ 启用'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(key.id)}
+                    className="text-red-500 text-xs hover:underline py-1 px-3"
+                  >
+                    {t('common.delete')}
+                  </button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Show new key modal */}
-      {newKeyValue && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-bold text-navy mb-2">{t('keys.key_value')}</h3>
-            <p className="text-sm text-gray-500 mb-4">⚠️ Save this key — it won't be shown again</p>
-            <div className="bg-gray-100 rounded-lg p-3 font-mono text-sm break-all text-gray-700 mb-4">
-              {newKeyValue}
+      {/* 密钥显示弹窗 - 只显示一次 */}
+      {showKeyModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-lg mx-4 text-center">
+            <div className="text-5xl mb-4">🔑</div>
+            <h3 className="text-xl font-bold text-navy mb-2">API Key 已创建</h3>
+            <p className="text-sm text-gray-500 mb-4">⚠️ 密钥仅显示这一次，请立即复制保存！</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-red-600">丢失将无法恢复，只能重新生成</p>
+            </div>
+            <div className="bg-gray-100 rounded-lg p-4 font-mono text-sm break-all text-left text-gray-700 mb-4 max-h-24 overflow-y-auto">
+              {showKeyModal.key}
             </div>
             <div className="flex gap-3">
-              <button onClick={copyKey} className="btn-primary flex-1">
-                {copied ? '✅ ' + t('keys.copied') : t('keys.copy')}
+              <button
+                onClick={() => { copyKey(showKeyModal.key); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                className="btn-primary flex-1"
+              >
+                {copied ? '✅ 已复制' : '📋 复制 Key'}
               </button>
-              <button onClick={() => setNewKeyValue(null)} className="btn-secondary flex-1">
+              <button onClick={() => setShowKeyModal(null)} className="btn-secondary flex-1">
                 {t('common.confirm')}
               </button>
             </div>
@@ -187,64 +194,92 @@ export default function ApiKeys() {
         </div>
       )}
 
-      {/* Create modal */}
+      {/* 创建 Key 弹窗 */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-navy mb-4">{t('keys.create')}</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
+              💡 填写你的上游 API Key（系统会为你生成一个对外使用的代理 Key）
+            </div>
             {error && <div className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded">{error}</div>}
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.name')}</label>
-                <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral" placeholder="My API Key" required />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Key 名称</label>
+                <input
+                  type="text" value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                  placeholder="我的 Gemini Key"
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.provider')}</label>
-                  <select value={form.provider} onChange={e => setForm({ ...form, provider: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral">
-                    {providers.filter(p => p !== 'other').map(p => <option key={p} value={p}>{providerLabels[p]}</option>)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">提供商</label>
+                  <select
+                    value={form.provider}
+                    onChange={e => setForm({ ...form, provider: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                  >
+                    <option value="openai">OpenAI</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="claude">Claude</option>
+                    <option value="qwen">Qwen</option>
+                    <option value="cohere">Cohere</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.model')}</label>
-                  <input type="text" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="gpt-4o-mini" required />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">模型</label>
+                  <input
+                    type="text" value={form.model}
+                    onChange={e => setForm({ ...form, model: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                    placeholder="gpt-4o-mini"
+                    required
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">API Secret *</label>
-                <input type="password" value={form.api_secret} onChange={e => setForm({ ...form, api_secret: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="sk-..." required />
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  上游 API Key <span className="text-gray-400 text-xs">（系统替你生成代理 Key）</span>
+                </label>
+                <input
+                  type="password" value={form.api_secret}
+                  onChange={e => setForm({ ...form, api_secret: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm"
+                  placeholder="sk-..."
+                  required
+                />
               </div>
 
-              {/* Advanced options */}
-              <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className="text-sm text-gray-500 border px-3 py-1 rounded hover:bg-gray-50">
-                {showAdvanced ? '▲ 收起高级选项' : '▼ 高级选项'}
-              </button>
-
-              {showAdvanced && (
-                <div className="space-y-3 p-3 border rounded-lg bg-gray-50">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.emb_model')}</label>
-                      <input type="text" value={form.embeddings_model} onChange={e => setForm({ ...form, embeddings_model: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="text-embedding-3-small" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.rate_limit')}</label>
-                      <input type="number" value={form.rate_limit} onChange={e => setForm({ ...form, rate_limit: parseInt(e.target.value) || 60 })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral" min={1} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Excluded Models <span className="text-gray-400 font-normal">(comma-separated)</span></label>
-                    <input type="text" value={form.excluded_models} onChange={e => setForm({ ...form, excluded_models: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm" placeholder="gpt-4,gpt-4-turbo" />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Embedding 模型</label>
+                  <input
+                    type="text" value={form.embeddings_model}
+                    onChange={e => setForm({ ...form, embeddings_model: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                    placeholder="可选"
+                  />
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('keys.rate_limit')}</label>
+                  <input
+                    type="number" value={form.rate_limit}
+                    onChange={e => setForm({ ...form, rate_limit: parseInt(e.target.value) || 60 })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral"
+                    min={1}
+                  />
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="btn-primary flex-1">{t('common.create')}</button>
-                <button type="button" onClick={() => { setShowCreate(false); setShowAdvanced(false); }} className="btn-secondary flex-1">
+                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1">
                   {t('common.cancel')}
                 </button>
               </div>

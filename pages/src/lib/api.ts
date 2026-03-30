@@ -57,7 +57,7 @@ export const adminApi = {
     request<{ keys: APIKey[] }>('/api/admin/keys'),
 
   createKey: (body: CreateKeyBody) =>
-    request<APIKey>('/api/admin/keys', {
+    request<CreateKeyResponse>('/api/admin/keys', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -168,9 +168,23 @@ export interface CreateKeyBody {
   name: string;
   provider: string;
   model: string;
-  api_secret: string;
+  api_secret?: string;  // optional - backend generates proxy key if not provided
+  embeddings_provider?: string;
   embeddings_model?: string;
+  excluded_models?: string;
   rate_limit?: number;
+}
+
+export interface CreateKeyResponse {
+  id: string;
+  key_prefix: string;
+  key_value: string;  // the proxy key shown ONCE
+  name: string;
+  provider: string;
+  model: string;
+  embeddings_model?: string;
+  rate_limit: number;
+  enabled: boolean;
 }
 
 export interface Provider {
