@@ -2,6 +2,16 @@
 
 const WORKERS_URL = import.meta.env.VITE_WORKERS_API_URL ?? '';
 
+// Runtime fallback: detect Workers URL when build-time var is empty
+function getWorkersUrl(): string {
+  if (WORKERS_URL) return WORKERS_URL;
+  // Auto-detect from current host: cliproxyapi-lite-xxx.pages.dev → cliproxyapi-lite-production.no9527.workers.dev
+  if (typeof window !== 'undefined' && window.location?.host) {
+    return 'https://cliproxyapi-lite-production.no9527.workers.dev';
+  }
+  return WORKERS_URL;
+}
+
 function getSessionToken(): string | null {
   return localStorage.getItem('session_token');
 }
@@ -19,7 +29,7 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(WORKERS_URL + path, {
+  const res = await fetch(getWorkersUrl() + path, {
     ...options,
     headers,
     credentials: 'include',
@@ -89,6 +99,16 @@ export const adminApi = {
 
   deleteProvider: (id: string) =>
     request<{ ok: boolean }>(`/api/admin/providers/${id}`, { method: 'DELETE' }),
+
+  // Fetch models from a provider's upstream /models endpoint (Workers proxies)
+  fetchProviderModels: (providerId: string, apiKey?: string) =>
+    request<{ models: Array<{ id: string; display_name: string; created?: number }>; provider: string }>(
+      `/api/admin/providers/${providerId}/models`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ api_key: apiKey }),
+      }
+    ),
 
   // Models
   listModels: () =>
@@ -271,6 +291,7 @@ export interface Settings {
   enabled_providers: string;
   maintenance_mode: boolean;
   language: 'en' | 'zh';
+  admin_token?: string;  // used when changing admin token via settings
 }
 
 export interface LogEntry {

@@ -100,20 +100,9 @@ export default function Models() {
     if (!provider) { setFetchingModels(false); return; }
 
     try {
-      // Call Workers API which proxies to the upstream provider
-      const res = await fetch(`/api/admin/providers/${providerId}/models`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: bulkApiKey || undefined }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
-        throw new Error((err as { message?: string }).message || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json() as { models: Array<{ id: string; display_name: string; created?: number }> };
-      setFetchedModels((data.models || []).sort((a, b) => a.id.localeCompare(b.id)));
+      // Call Workers API via adminApi which handles URL fallback
+      const res = await adminApi.fetchProviderModels(providerId, bulkApiKey || undefined);
+      setFetchedModels((res.models || []).sort((a, b) => a.id.localeCompare(b.id)));
     } catch (err) {
       setError((err as Error).message || '获取模型列表失败');
     } finally {

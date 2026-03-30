@@ -39,25 +39,13 @@ export default function Settings() {
     if (newToken.length < 8) { setTokenMsg('Token must be at least 8 characters'); return; }
     try {
       // Verify current token first
-      await fetch(import.meta.env.VITE_WORKERS_API_URL + '/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: currentToken }),
-      }).then(r => r.json()).then(async (res) => {
-        if (!res.ok) { setTokenMsg('Current token is incorrect'); return; }
-        // Update token via a dedicated endpoint
-        await fetch(import.meta.env.VITE_WORKERS_API_URL + '/api/admin/settings', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem('session_token'),
-          },
-          body: JSON.stringify({ admin_token: newToken }),
-        });
-        setTokenMsg('✅ Token updated! Save settings to apply.');
-        setCurrentToken('');
-        setNewToken('');
-      });
+      const res = await adminApi.login(currentToken);
+      if (!res.ok) { setTokenMsg('Current token is incorrect'); return; }
+      // Update token via settings
+      await adminApi.updateSettings({ admin_token: newToken } as Parameters<typeof adminApi.updateSettings>[0]);
+      setTokenMsg('✅ Token updated! Save settings to apply.');
+      setCurrentToken('');
+      setNewToken('');
     } catch {
       setTokenMsg('Failed to update token');
     }
