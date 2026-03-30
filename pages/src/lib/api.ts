@@ -1,14 +1,8 @@
 // API client for Pages → Workers admin endpoints
+// Hardcode Workers URL to avoid runtime resolution issues
+const WORKERS_URL = import.meta.env.VITE_WORKERS_API_URL || 'https://cliproxyapi-lite-production.no9527.workers.dev';
 
-const WORKERS_URL = import.meta.env.VITE_WORKERS_API_URL ?? '';
-
-// Runtime fallback: detect Workers URL when build-time var is empty
 function getWorkersUrl(): string {
-  if (WORKERS_URL) return WORKERS_URL;
-  // Auto-detect from current host: cliproxyapi-lite-xxx.pages.dev → cliproxyapi-lite-production.no9527.workers.dev
-  if (typeof window !== 'undefined' && window.location?.host) {
-    return 'https://cliproxyapi-lite-production.no9527.workers.dev';
-  }
   return WORKERS_URL;
 }
 
