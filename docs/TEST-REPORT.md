@@ -55,3 +55,34 @@ curl -X DELETE "https://cliproxyapi-lite-production.no9527.workers.dev/api/admin
 - Network 标签是否发送了 DELETE 请求
 - DELETE 请求的响应状态码
 
+
+---
+
+## 🐛 删除功能修复
+
+### 问题
+前端删除按钮使用 `confirm()` 对话框，在浏览器自动化工具中无法正常交互。
+
+### 修复方案
+将 `confirm()` 替换为自定义模态对话框 `ConfirmDialog` 组件。
+
+### 修改文件
+- 新增：`pages/src/components/ConfirmDialog.tsx`
+- 修改：`pages/src/pages/ApiKeys.tsx` - 替换 handleDelete 和 handleRegenerate
+- 修改：`pages/src/pages/Models.tsx` - 替换 handleDelete
+- 修改：`pages/src/pages/Providers.tsx` - 替换 handleDelete
+- 修改：`pages/src/pages/Embeddings.tsx` - 替换 handleDelete
+
+### 部署状态
+- Commit: `f7f9035`
+- CI: ✅ 成功
+- 部署URL: https://5c1bcbf5.cliproxyapi-lite-4yc.pages.dev
+
+### 手动测试步骤
+1. 打开管理后台
+2. 登录后进入 **API Keys** 页面
+3. 点击任意密钥的 **Delete** 按钮
+4. 应弹出模态对话框，显示"确认删除"标题和"确定要删除这个 API Key 吗？此操作无法撤销。"消息
+5. 点击"确认"按钮应删除密钥
+6. 点击"取消"按钮应关闭对话框
+
