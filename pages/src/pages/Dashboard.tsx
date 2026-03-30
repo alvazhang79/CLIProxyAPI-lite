@@ -30,6 +30,21 @@ export default function Dashboard() {
     <div>
       <h1 className="text-2xl font-bold text-navy mb-6">{t('dashboard.title')}</h1>
 
+      {/* API URL Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl">🌐</span>
+          <span className="font-semibold text-navy">API 端点</span>
+        </div>
+        <div className="font-mono text-sm bg-white rounded-lg px-3 py-2 border border-blue-100">
+          https://cliproxyapi-lite-production.no9527.workers.dev
+        </div>
+        <div className="text-xs text-gray-500 mt-2">
+          使用方式：Header <code className="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;your-api-key&gt;</code>
+          ，端点 <code className="bg-gray-100 px-1 rounded">/v1/chat/completions</code>
+        </div>
+      </div>
+
       {/* Stat Cards */}
       <div className="grid grid-cols-4 gap-6 mb-8">
         {statCards.map(card => (
