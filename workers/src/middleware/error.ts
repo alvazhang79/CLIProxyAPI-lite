@@ -14,8 +14,10 @@ export class APIError extends Error {
   }
 
   toResponse(): Response {
-    const str = i18n(this.lang as unknown as string);
-    const msg = (str.error as Record<string, string>)[this.code] ?? this.message;
+    // Always use the specific error message from this.message; i18n translations are only
+    // used for generic error types (server_error, method_not_allowed, etc.) that don't have
+    // a specific message set.
+    const msg = this.message;
 
     const body: OpenAIError = {
       error: {

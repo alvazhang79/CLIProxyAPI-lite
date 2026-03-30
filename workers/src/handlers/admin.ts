@@ -307,18 +307,10 @@ export async function handleFetchProviderModels(c: Context): Promise<Response> {
   const id = c.req.param('id') as string;
   const d1 = c.get('D1');
   let body: Record<string, unknown> | null = null;
-  let bodyRaw = '';
   try {
-    // Read body as text first (more reliable than json() in CF Workers)
-    bodyRaw = await c.req.text();
+    body = await c.req.json() as Record<string, unknown> | null;
   } catch {
-    // empty - bodyRaw stays ''
-  }
-  if (bodyRaw) {
-    try { body = JSON.parse(bodyRaw); } catch { body = null; }
-  }
-  if (body === null) {
-    throw new APIError(400, 'invalid_request', 'BODY_PARSE_FAILED raw=' + JSON.stringify(bodyRaw).slice(0, 50), detectLang(c.req.header('accept-language')));
+    body = null;
   }
 
   const provider = await findCustomProviderById(d1, id);
