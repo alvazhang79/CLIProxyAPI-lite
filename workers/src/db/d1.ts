@@ -60,7 +60,7 @@ export async function createAPIKey(
     'INSERT INTO api_keys ' +
     '(id, api_key, key_prefix, name, provider, model, allowed_models, api_secret, ' +
     'embeddings_provider, embeddings_model, excluded_models, rate_limit, enabled, created_at, updated_at) ' +
-    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const result = await stmt.bind(
     record.id, record.api_key, record.key_prefix, record.name,
