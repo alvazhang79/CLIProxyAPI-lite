@@ -13,6 +13,7 @@ export default function ApiKeys() {
   const [showKeyModal, setShowKeyModal] = useState<{ key: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -40,6 +41,15 @@ export default function ApiKeys() {
     embeddings_model: '',
     rate_limit: 60,
   });
+
+  // Generate random API key
+  const generateApiKey = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const key = 'sk_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => chars[b % chars.length])
+      .join('');
+    setForm({ ...form, api_secret: key });
+  };
 
   const loadData = () => {
     Promise.all([adminApi.listKeys(), adminApi.listModels(), adminApi.listProviders()])
@@ -231,21 +241,21 @@ export default function ApiKeys() {
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4 flex-wrap justify-end">
-                    <button
-                      onClick={() => {
-                        setConfirmDialog({
-                          isOpen: true,
-                          title: '无法复制旧密钥',
-                          message: '密钥只在创建时显示一次，已无法获取。请点击「重新生成」来生成新密钥。',
-                          onConfirm: () => setConfirmDialog((prev) => ({ ...prev, isOpen: false })),
-                          danger: false,
-                        });
-                      }}
-                      className="btn-secondary text-xs py-1 px-3 opacity-50"
-                      title="密钥已不可见"
-                    >
-                      📋 复制
-                    </button>
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setCopyTooltip(key.id)}
+                        onMouseLeave={() => setCopyTooltip(null)}
+                        className="btn-secondary text-xs py-1 px-3 opacity-50"
+                      >
+                        📋 复制
+                      </button>
+                      {copyTooltip === key.id && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                          密钥已不可见，请点击「重新生成」
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => handleRegenerate(key.id, key.name)}
                       className="btn-secondary text-xs py-1 px-3"
@@ -391,14 +401,23 @@ export default function ApiKeys() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">上游 API Key</label>
-                <input
-                  type="password"
-                  value={form.api_secret}
-                  onChange={(e) => setForm({ ...form, api_secret: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm"
-                  placeholder="sk-..."
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.api_secret}
+                    onChange={(e) => setForm({ ...form, api_secret: e.target.value })}
+                    className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-coral font-mono text-sm"
+                    placeholder="sk-... 或点击生成按钮"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={generateApiKey}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap"
+                  >
+                    🎲 生成
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
