@@ -132,7 +132,9 @@ export default function ApiKeys() {
         setError('');
         try {
           const result = await adminApi.regenerateKey(id);
-          setShowKeyModal({ key: result.key_value, name: `${name} (已重新生成)` });
+          // 直接复制到剪贴板
+          navigator.clipboard.writeText(result.key_value);
+          alert('✅ 密钥已重新生成！\n\n新密钥已复制到剪贴板：\n' + result.key_value + '\n\n请妥善保存，此密钥只显示一次。');
           loadData();
         } catch (err) {
           setError((err as Error).message);
