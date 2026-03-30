@@ -157,21 +157,28 @@ export async function handleCreateKey(c: Context): Promise<Response> {
     ? body.allowed_models
     : []; // empty = allow all models (backward compat)
 
-  await createAPIKey(d1, {
-    id,
-    api_key: keyHash,
-    key_prefix: keyPrefix,
-    name: body.name,
-    provider: body.provider,
-    model: body.model,
-    allowed_models: allowedModels,
-    api_secret: encryptedSecret,
-    embeddings_provider: body.embeddings_model ? body.provider : undefined,
-    embeddings_model: body.embeddings_model,
-    excluded_models: [],
-    rate_limit: body.rate_limit ?? 60,
-    enabled: true,
-  });
+  let apiKeyId = '';
+  try {
+    apiKeyId = await createAPIKey(d1, {
+      id,
+      api_key: keyHash,
+      key_prefix: keyPrefix,
+      name: body.name,
+      provider: body.provider,
+      model: body.model,
+      allowed_models: allowedModels,
+      api_secret: encryptedSecret,
+      embeddings_provider: body.embeddings_model ? body.provider : undefined,
+      embeddings_model: body.embeddings_model,
+      excluded_models: [],
+      rate_limit: body.rate_limit ?? 60,
+      enabled: true,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[createAPIKey error]', msg);
+    throw new APIError(500, 'server_error', 'Database error: ' + msg, detectLang(c.req.header('accept-language')));
+  }
 
   return c.json({
     id, key_prefix: keyPrefix, name: body.name,

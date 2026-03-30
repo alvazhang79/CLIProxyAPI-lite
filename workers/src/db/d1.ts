@@ -70,7 +70,10 @@ export async function createAPIKey(
     JSON.stringify(record.excluded_models), record.rate_limit,
     record.enabled ? 1 : 0, now, now
   ).run();
-  return result.success ? record.id : '';
+  if (!result.success) {
+    throw new Error(`D1 insert failed: ${JSON.stringify(result.error)}`);
+  }
+  return record.id;
 }
 
 export async function listAPIKeys(d1: D1Database): Promise<Partial<APIKeyRecord>[]> {
