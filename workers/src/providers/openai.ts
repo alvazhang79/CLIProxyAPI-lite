@@ -168,9 +168,14 @@ export class OpenAICompatibleProvider {
     model: string,
     input: string | string[],
     encodingFormat: 'float' | 'base64' = 'float',
+    inputType?: 'query' | 'passage' | 'document',
   ): Promise<ProviderResponse> {
     const url = this.buildUrl('/embeddings');
-    const payload = { model, input, encoding_format: encodingFormat };
+    const payload: Record<string, unknown> = { model, input, encoding_format: encodingFormat };
+    // NVIDIA embedding models require input_type
+    if (inputType) {
+      payload.input_type = inputType;
+    }
 
     try {
       const res = await fetch(url, {

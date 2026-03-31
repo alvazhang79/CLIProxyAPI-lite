@@ -15,6 +15,7 @@ const EmbeddingsRequestSchema = z.object({
   input: z.union([z.string(), z.array(z.string())]),
   encoding_format: z.enum(['float', 'base64']).optional().default('float'),
   dimensions: z.number().optional(),
+  input_type: z.enum(['query', 'passage', 'document']).optional(),
   index: z.boolean().optional().default(false),
   metadata: z.record(z.string()).optional(),
   // ✨ RAG search params (admin only)
@@ -43,7 +44,7 @@ export async function handleEmbeddings(c: Context) {
     throw new APIError(400, 'invalid_request', 'Invalid embeddings request', lang);
   }
 
-  const { model, input, encoding_format, index, metadata, search, query_vector, top_k, min_score } = body;
+  const { model, input, encoding_format, input_type, index, metadata, search, query_vector, top_k, min_score } = body;
   const texts = Array.isArray(input) ? input : [input];
 
   // ✨ If search=true, perform similarity search against stored embeddings
@@ -91,7 +92,7 @@ export async function handleEmbeddings(c: Context) {
   });
 
   // Call upstream
-  const res = await provider.embeddings(embeddingModel, texts, encoding_format ?? 'float');
+  const res = await provider.embeddings(embeddingModel, texts, encoding_format ?? 'float', input_type);
 
   if (res.status !== 200) {
     const err = (res.data as { error?: { message?: string } }).error;
