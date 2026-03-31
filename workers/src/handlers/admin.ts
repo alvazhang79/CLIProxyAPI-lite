@@ -217,6 +217,10 @@ export async function handlePatchKey(c: Context): Promise<Response> {
     updates.allowed_models = JSON.stringify(body.allowed_models);
   }
 
+  if (body.api_secret !== undefined) {
+    const encrypted = await encryptSecret(c, body.api_secret as string);
+    updates.api_secret = encrypted;
+  }
   await updateAPIKey(d1, id, updates as Parameters<typeof updateAPIKey>[2]);
   return c.json({ ok: true });
 }

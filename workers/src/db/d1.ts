@@ -124,6 +124,10 @@ export async function updateAPIKey(
   if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
   if (updates.rate_limit !== undefined) { fields.push('rate_limit = ?'); values.push(updates.rate_limit); }
   if (updates.allowed_models !== undefined) { fields.push('allowed_models = ?'); values.push(JSON.stringify(updates.allowed_models)); }
+  if (updates.api_secret !== undefined) {
+    fields.push('api_secret = ?');
+    values.push(updates.api_secret);
+  }
 
   if (fields.length === 0) return false;
 
