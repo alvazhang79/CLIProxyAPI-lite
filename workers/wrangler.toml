@@ -3,13 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2024-04-15"
 compatibility_flags = ["nodejs_compat"]
 
-# ---- KV Namespaces (production) ----
-[[env.production.kv_namespaces]]
+# ---- KV Namespaces ----
+[[kv_namespaces]]
 binding = "KV"
 id = "4e81ec19fea94b9a860707970faf1415"
 
-# ---- D1 Databases (production) ----
-[[env.production.d1_databases]]
+# ---- D1 Databases ----
+[[d1_databases]]
 binding = "D1"
 database_name = "cliproxyapi-lite-db"
 database_id = "4644e1d1-138b-4fa4-b97a-34adbf664bc4"
@@ -18,10 +18,15 @@ database_id = "4644e1d1-138b-4fa4-b97a-34adbf664bc4"
 [vars]
 WORKERS_ENV = "development"
 
+# ---- Production Environment ----
 [env.production.vars]
 WORKERS_ENV = "production"
 
-# ---- Analytics Engine ----
-# [[analytics_engine_datasets]]
-# binding = "ANALYTICS"
-# dataset = "cliproxyapi-lite"
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "4e81ec19fea94b9a860707970faf1415"
+
+[[env.production.d1_databases]]
+binding = "D1"
+database_name = "cliproxyapi-lite-db"
+database_id = "4644e1d1-138b-4fa4-b97a-34adbf664bc4"

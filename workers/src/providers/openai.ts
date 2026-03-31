@@ -61,7 +61,7 @@ export class OpenAICompatibleProvider {
     body: Record<string, unknown>,
     extraHeaders?: Record<string, string>,
   ): Promise<ProviderResponse> {
-    const url = this.buildUrl('/v1/chat/completions');
+    const url = this.buildUrl('/chat/completions');
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -96,7 +96,7 @@ export class OpenAICompatibleProvider {
     body: Record<string, unknown>,
     extraHeaders?: Record<string, string>,
   ): AsyncGenerator<StreamChunk, void, unknown> {
-    const url = this.buildUrl('/v1/chat/completions');
+    const url = this.buildUrl('/chat/completions');
 
     try {
       const res = await fetch(url, {
@@ -168,7 +168,7 @@ export class OpenAICompatibleProvider {
     input: string | string[],
     encodingFormat: 'float' | 'base64' = 'float',
   ): Promise<ProviderResponse> {
-    const url = this.buildUrl('/v1/embeddings');
+    const url = this.buildUrl('/embeddings');
     const payload = { model, input, encoding_format: encodingFormat };
 
     try {
