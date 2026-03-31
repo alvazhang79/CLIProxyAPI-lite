@@ -67,13 +67,14 @@ registerTranslator({
   toOpenAIStream(chunk, _model, index = 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = chunk as any;
+    const delta = c.choices?.[0]?.delta ?? c.delta ?? {};
     return {
       index,
       delta: {
-        role: c.delta?.role as 'assistant' | undefined,
-        content: c.delta?.content ?? null,
+        role: delta?.role as 'assistant' | undefined,
+        content: delta?.content ?? delta?.reasoning ?? null,
       },
-      finish_reason: c.finish_reason ?? null,
+      finish_reason: c.choices?.[0]?.finish_reason ?? c.finish_reason ?? null,
     };
   },
 });

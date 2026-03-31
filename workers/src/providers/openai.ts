@@ -139,7 +139,8 @@ export class OpenAICompatibleProvider {
 
             try {
               const parsed = JSON.parse(data);
-              const delta = parsed.choices?.[0]?.delta?.content ?? '';
+              const choice = parsed.choices?.[0];
+      const delta = choice?.delta?.content ?? choice?.delta?.reasoning ?? '';
               const finish = parsed.choices?.[0]?.finish_reason;
               yield {
                 type: 'delta',
