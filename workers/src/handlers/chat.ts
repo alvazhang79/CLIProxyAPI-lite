@@ -153,8 +153,10 @@ async function nonStreamResponse(
 
     return c.json(data);
   } catch (e) {
+    console.error('[Chat Error]', e);
     if (e instanceof APIError) throw e;
-    throw new APIError(502, 'upstream_error', 'Failed to get completion', lang);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    throw new APIError(502, 'upstream_error', `Failed: ${errMsg}`, lang);
   }
 }
 
