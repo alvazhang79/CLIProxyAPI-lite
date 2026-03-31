@@ -1,168 +1,222 @@
 # CLIProxyAPI Lite
 
-> **"Lightweight AI Gateway, Powered by Edge"**
-> 轻量 AI 网关，边缘驱动
+轻量级 API 代理平台，支持多 Provider（OpenAI/Gemini/Claude/NVIDIA 等），带管理后台和 AES-256-GCM 密钥加密。
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
+## 特性
 
-**English** | [中文](./README_ZH.md)
+- 🚀 **多 Provider 支持**: OpenAI、Gemini、Claude、NVIDIA、Groq、硅基流动等
+- 🔐 **密钥加密**: AES-256-GCM 加密存储上游 API Key
+- 📊 **管理后台**: React + TailwindCSS 构建的现代化管理界面
+- ⚡ **Cloudflare Workers**: 全球边缘部署，低延迟
+- 💾 **D1 数据库**: SQLite 存储配置和日志
+- 🔄 **流式响应**: 完整支持 SSE 流式输出
 
----
+## 快速部署
 
-A lightweight, edge-native AI API gateway built on Cloudflare Workers and Pages. One OpenAI-compatible endpoint, multiple upstream AI providers. Supports **chat/completion**, **embeddings**, per-key LLM routing, and a bilingual admin dashboard.
+### 前置要求
 
-**Based on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Adds native CF Workers/Pages support and embeddings.**
+1. [Cloudflare 账号](https://dash.cloudflare.com/sign-up)
+2. Node.js 18+
+3. Git
 
----
-
-## ✨ Features
-
-- 🌐 **OpenAI-Compatible API** — Drop-in replacement for OpenAI SDKs and tools
-- 🤖 **Multi-Provider Routing** — OpenAI · Gemini · Claude · Qwen · Cohere (extensible)
-- 📊 **Embeddings Support** — `/v1/embeddings` endpoint with local vector storage ✨
-- 🔗 **Custom Providers & Model Aliases** — Add any OpenAI-compatible relay (OpenRouter, iFlow, custom Clash nodes), define model aliases (e.g. `kimi-k2` → `moonshotai/kimi-k2:free`) via admin API without code changes ✨
-- 🔑 **Per-Key LLM Binding** — Each API key maps to a specific provider + model
-- 🚀 **Edge-Native** — Deployed on 300+ Cloudflare PoPs worldwide, sub-10ms cold start
-- 📈 **Admin Dashboard** — Bilingual (EN/ZH) web UI, token auth, no user accounts needed
-- 🔒 **Secure by Design** — AES-256-GCM secrets, bcrypt admin auth, per-key rate limiting
-- 💾 **D1 + KV** — SQLite at the edge for config, Workers KV for hot cache
-
----
-
-## Quick Start
+### 步骤 1: Fork 或 Clone
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/<your-name>/cliproxyapi-lite.git
-cd cliproxyapi-lite
+git clone https://github.com/YOUR_USERNAME/CLIProxyAPI-lite.git
+cd CLIProxyAPI-lite
+npm install
+```
 
-# 2. Install dependencies
+### 步骤 2: 创建 Cloudflare 资源
+
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. 获取你的 **Account ID**（在右侧栏）
+3. 创建 **API Token**：
+   - 进入 [My Profile > API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+   - 点击「Create Token」
+   - 选择「Edit Cloudflare Workers」模板
+   - **重要**: 添加以下权限：
+     - `Account > Workers Scripts > Edit`
+     - `Account > Workers KV Storage > Edit`
+     - `Account > D1 > Edit`
+   - 点击「Continue to summary」→「Create Token」
+   - 复制生成的 Token
+
+### 步骤 3: 配置 GitHub Secrets
+
+在你的 GitHub 仓库中，进入 Settings > Secrets and variables > Actions，添加：
+
+| Secret 名称 | 值 |
+|------------|---|
+| `CLOUDFLARE_API_TOKEN` | 上一步获取的 API Token |
+| `CLOUDFLARE_ACCOUNT_ID` | 你的 Cloudflare Account ID |
+
+### 步骤 4: 推送触发部署
+
+```bash
+git add .
+git commit -m "Initial deployment"
+git push origin main
+```
+
+GitHub Actions 会自动完成部署。
+
+### 步骤 5: 设置管理员密码
+
+部署完成后，需要设置管理员密码：
+
+```bash
+# 安装 wrangler
+npm install -g wrangler
+
+# 登录 Cloudflare
+wrangler login
+
+# 设置管理员密码（替换 YOUR_PASSWORD 为你的密码）
+cd workers
+wrangler secret put ADMIN_TOKEN --env production
+# 输入: YOUR_PASSWORD（至少 8 个字符）
+```
+
+### 步骤 6: 访问管理后台
+
+部署成功后，GitHub Actions 日志会显示 Workers URL，类似：
+
+```
+https://cliproxyapi-lite-production.YOUR-SUBDOMAIN.workers.dev
+```
+
+访问该 URL 即可进入管理后台。
+
+## 本地开发
+
+```bash
+# 安装依赖
 npm install
 
-# 3. Configure secrets
-wrangler secret put ADMIN_TOKEN        # Your admin login token
-wrangler secret put ENCRYPTION_KEY    # 32-byte key, base64 encoded
+# 启动 Workers 开发服务器
+cd workers && npm run dev
 
-# 4. Create & migrate D1 database
-wrangler d1 create cliproxyapi-lite-db
-# Copy database_id to workers/wrangler.toml and pages/wrangler.toml
-wrangler d1 execute cliproxyapi-lite-db --file=scripts/init-d1.sql
+# 在另一个终端启动 Pages 开发服务器
+cd pages && npm run dev
 
-# 5. Deploy Workers
-cd workers && wrangler deploy
-
-# 6. Deploy Pages
-cd ../pages && wrangler pages deploy
-
-# 7. Set Pages env vars
-wrangler secret put WORKERS_API_URL=https://your-workers-subdomain.workers.dev
+# Workers: http://localhost:8787
+# Pages: http://localhost:5173 (自动代理到 Workers)
 ```
 
----
+## 使用方法
 
-## Usage
+### 1. 登录管理后台
 
-### Get your API Key
+使用你设置的 `ADMIN_TOKEN` 登录。
+
+### 2. 添加 Provider
+
+在「Providers」页面添加上游 API：
+
+| 字段 | 示例值 |
+|------|--------|
+| Name | `nvidia` |
+| Display Name | `NVIDIA NIM` |
+| Base URL | `https://integrate.api.nvidia.com/v1` |
+| Auth Type | `Bearer Token` |
+
+### 3. 添加模型
+
+在「Models」页面添加可用模型：
+
+- 点击「从 Provider 获取模型列表」自动导入
+- 或手动添加：Model ID = `nvidia/llama-3.1-nemotron-70b-instruct`
+
+### 4. 创建 API Key
+
+在「API Keys」页面创建代理 Key：
+
+- 系统会生成 `sk_live_xxx` 格式的密钥
+- 选择允许访问的模型
+
+### 5. 调用 API
 
 ```bash
-# In the Admin Dashboard (http://your-pages-site/admin)
-# Create an API key bound to your provider + model
-```
-
-### Use with OpenAI SDK
-
-```python
-import openai
-
-client = openai.OpenAI(
-    api_key="sk_live_xxxxxxxxxxxx",      # Your CLIProxyAPI Lite key
-    base_url="https://your-workers.workers.dev"  # Your Workers URL
-)
-
-# Chat completion
-chat = client.chat.completions.create(
-    model="gemini-2.5-pro",              # Model name (per-key configured)
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-print(chat.choices[0].message.content)
-
-# Embeddings ✨
-emb = client.embeddings.create(
-    model="text-embedding-3-small",       # Or your configured embedding model
-    input="Hello world"
-)
-print(emb.data[0].embedding)
-```
-
-### Use with cURL
-
-```bash
-curl https://your-workers.workers.dev/v1/chat/completions \
-  -H "Authorization: Bearer sk_live_xxxxxxxxxxxx" \
+curl https://YOUR-WORKERS-URL/v1/chat/completions \
+  -H "Authorization: Bearer sk_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-2.5-pro",
-    "messages": [{"role": "user", "content": "Hi"}],
-    "stream": false
+    "model": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
 
----
+## Embedding 模型使用
 
-## Architecture
+NVIDIA Embedding 模型需要 `input_type` 参数：
 
-```
-Client (OpenAI SDK / cURL)
-         │
-         ▼
-Cloudflare Workers (Edge)
-  ├─ API Key Auth (KV cache)
-  ├─ Format Translator
-  └─ Provider Router
-         │
-  ┌──────┼──────────────────┐
-  ▼      ▼                  ▼
-OpenAI  Gemini CLI         Claude Code
-API      OAuth              OAuth
+```bash
+curl https://YOUR-WORKERS-URL/v1/embeddings \
+  -H "Authorization: Bearer sk_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nvidia/llama-3.2-nemoretriever-300m-embed-v1",
+    "input": "Hello world",
+    "input_type": "query"
+  }'
 ```
 
----
+`input_type` 参数：
+- `query`: 搜索查询
+- `passage`: 文档段落
+- `document`: 完整文档
 
-## API Endpoints
+## 项目结构
 
-| Endpoint | Description |
-|----------|-------------|
-| `POST /v1/chat/completions` | Chat completion |
-| `POST /v1/completions` | Text completion |
-| `POST /v1/messages` | Anthropic messages API |
-| **`POST /v1/embeddings`** | Text embeddings ✨ |
-| `GET /v1/models` | List models |
-| `GET /health` | Health check |
+```
+CLIProxyAPI-lite/
+├── workers/           # Cloudflare Workers 后端
+│   ├── src/
+│   │   ├── handlers/  # API 处理器
+│   │   ├── providers/ # Provider 适配器
+│   │   ├── db/        # D1 数据库操作
+│   │   └── lib/       # 加密等工具
+│   └── wrangler.toml  # Workers 配置
+├── pages/             # Cloudflare Pages 前端
+│   ├── src/
+│   │   ├── pages/     # 页面组件
+│   │   └── lib/       # API 客户端
+│   └── wrangler.toml  # Pages 配置
+└── .github/
+    └── workflows/
+        └── deploy.yml # CI/CD 配置
+```
 
----
+## 故障排除
 
-## Tech Stack
+### 部署失败
 
-| Layer | Technology |
-|-------|------------|
-| API Gateway | Cloudflare Workers (TypeScript) |
-| Frontend | Cloudflare Pages + React + TailwindCSS |
-| Database | Cloudflare D1 (SQLite at edge) |
-| Cache | Cloudflare Workers KV |
-| i18n | react-i18next (EN + ZH) |
+1. 检查 GitHub Secrets 是否正确设置
+2. 确认 API Token 有 D1 Edit 权限
+3. 查看 GitHub Actions 日志
 
----
+### 登录失败
+
+```bash
+# 重新设置管理员密码
+cd workers
+wrangler secret put ADMIN_TOKEN --env production
+```
+
+### API 调用失败
+
+1. 检查 API Key 是否正确
+2. 确认模型已添加到系统
+3. 检查上游 Provider 的 API Key 是否有效
+
+## 技术栈
+
+- **Backend**: Hono + TypeScript + Cloudflare Workers
+- **Frontend**: React + TailwindCSS + Cloudflare Pages
+- **Database**: Cloudflare D1 (SQLite)
+- **CI/CD**: GitHub Actions
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
-
----
-
-## Logo
-
-![logo](./pages/public/logo.svg)
-
-Mascot: 🦐 (shrimp) + ⚡ (lightning) + ☁️ (cloud) — the essence of "Lite, Fast, Edge".
+MIT

@@ -37,7 +37,7 @@ export default function Dashboard() {
           <span className="font-semibold text-navy">API 端点</span>
         </div>
         <div className="font-mono text-sm bg-white rounded-lg px-3 py-2 border border-blue-100">
-          https://cliproxyapi-lite-production.no9527.workers.dev
+          window.location.origin
         </div>
         <div className="text-xs text-gray-500 mt-2">
           使用方式：Header <code className="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;your-api-key&gt;</code>

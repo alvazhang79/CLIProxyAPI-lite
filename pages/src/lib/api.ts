@@ -1,6 +1,6 @@
 // API client for Pages → Workers admin endpoints
 // Hardcode Workers URL to avoid runtime resolution issues
-const WORKERS_URL = import.meta.env.VITE_WORKERS_API_URL || 'https://cliproxyapi-lite-production.no9527.workers.dev';
+const WORKERS_URL = import.meta.env.VITE_WORKERS_API_URL || window.location.origin;
 
 function getWorkersUrl(): string {
   return WORKERS_URL;
